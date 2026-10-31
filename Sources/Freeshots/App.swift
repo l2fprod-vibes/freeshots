@@ -143,7 +143,7 @@ final class CaptureCoordinator {
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = ScreenshotExport.suggestedFilename
         panel.canCreateDirectories = true
-        panel.begin { [weak self] response in
+        let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let destination = panel.url else { return }
             do {
                 try data.write(to: destination, options: .atomic)
@@ -153,6 +153,17 @@ final class CaptureCoordinator {
                 self?.statusMessage = "Unable to save screenshot. Choose another location or try again."
             }
         }
+        if let editorPanel, editorPanel.isVisible {
+            panel.beginSheetModal(for: editorPanel, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
+        }
+    }
+
+    func openScreenRecordingSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") else { return }
+        editorPanel?.orderOut(nil)
+        NSWorkspace.shared.open(url)
     }
 
     private func confirmClose() -> Bool {

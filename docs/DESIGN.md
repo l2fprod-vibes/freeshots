@@ -8,7 +8,7 @@ Menu bar extra with capture overlays, a floating screenshot editor, and a Settin
 
 - **Menu bar:** Capture Area, Capture Window, Capture Display, Settings, Quit.
 - **Capture overlay:** choose or confirm the screen content to capture; Escape cancels.
-- **Floating Editor:** review one screenshot, add markup, then Copy, Save, or Drag to Save.
+- **Floating Editor:** review one screenshot, add markup, then Copy, Save, or drag the compact bottom handle.
 - **Settings:** Keyboard Shortcuts and Appearance.
 
 ## Command map

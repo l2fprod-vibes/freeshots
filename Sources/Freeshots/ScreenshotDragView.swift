@@ -4,23 +4,24 @@ import UniformTypeIdentifiers
 
 struct DragToSaveControl: View {
     let dataProvider: @MainActor () -> Data?
+    @State private var isHovering = false
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: KitMetric.controlRadius, style: .continuous)
-                .fill(Ink.surface)
-            VStack(spacing: 4) {
-                Image(systemName: "arrow.up.doc")
-                Text("Drag")
-                    .font(.system(size: 10, weight: .semibold))
-            }
-            .foregroundStyle(Ink.text)
+            Image(systemName: "arrow.up.doc")
+                .foregroundStyle(Ink.text)
+                .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
+                .background(
+                    isHovering ? Ink.selection : .clear,
+                    in: RoundedRectangle(cornerRadius: KitMetric.controlRadius, style: .continuous)
+                )
+                .onHover { isHovering = $0 }
+                .animation(KitMotion.hover, value: isHovering)
             PromiseDragView(dataProvider: dataProvider)
                 .accessibilityLabel("Drag to Save")
                 .accessibilityHint("Create a PNG file from this screenshot")
         }
-        .overlay(RoundedRectangle(cornerRadius: KitMetric.controlRadius).stroke(Ink.divider, lineWidth: 1))
-        .help("Create a PNG file from this screenshot")
+        .help("Drag this screenshot to create a PNG file")
     }
 }
 
@@ -43,8 +44,9 @@ private final class PromiseDragNSView: NSView, NSDraggingSource {
     private var promise: ScreenshotFilePromise?
 
     override var acceptsFirstResponder: Bool { false }
+    override var mouseDownCanMoveWindow: Bool { false }
     override func accessibilityLabel() -> String? { "Drag to Save" }
-    override func accessibilityHelp() -> String? { "Create a PNG file from this screenshot" }
+    override func accessibilityHelp() -> String? { "Drag this screenshot to create a PNG file" }
 
     override func mouseDragged(with event: NSEvent) {
         guard let data = dataProvider?() else { return }

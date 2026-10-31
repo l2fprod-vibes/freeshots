@@ -9,7 +9,18 @@ scratch="${TMPDIR:-/tmp}/Freeshots-build"
 version="${APP_VERSION:-0.1}"
 build_number="${APP_BUILD:-$(date +%Y%m%d%H%M)}"
 bundle_id="${APP_BUNDLE_ID:-com.l2fprod.freeshots}"
-identity="${CODESIGN_IDENTITY:--}"
+identity="${CODESIGN_IDENTITY:-}"
+
+if [[ -z "$identity" ]]; then
+  identity=$(security find-identity -v -p codesigning \
+    | sed -n 's/.*"\(Apple Development:.*\)"/\1/p' \
+    | head -n 1)
+fi
+
+if [[ -z "$identity" || "$identity" == "-" ]]; then
+  print -u2 "No Apple Development signing identity found. Install one in Keychain Access or set CODESIGN_IDENTITY to its name. Ad hoc signing is disabled because it resets macOS privacy grants between builds."
+  exit 1
+fi
 
 if [[ "${BUILD_UNIVERSAL:-0}" == "1" ]]; then
   for arch in arm64 x86_64; do
@@ -38,9 +49,5 @@ if [[ -f "$here/Resources/AppIcon.icns" ]]; then
   cp "$here/Resources/AppIcon.icns" "$app/Contents/Resources/"
 fi
 
-if [[ "$identity" == "-" ]]; then
-  codesign --force --sign - "$app"
-else
-  codesign --force --sign "$identity" --options runtime --timestamp "$app"
-fi
+codesign --force --sign "$identity" "$app"
 echo "built $app"

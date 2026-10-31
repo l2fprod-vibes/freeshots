@@ -15,13 +15,6 @@ struct WindowChrome: NSViewRepresentable {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.styleMask.insert(.fullSizeContentView)
-
-        for (index, type) in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].enumerated() {
-            guard let button = window.standardWindowButton(type), let container = button.superview else { continue }
-            let x = 22 + CGFloat(index) * 18.25
-            button.setFrameOrigin(NSPoint(x: x - button.frame.width / 2,
-                                          y: container.frame.height - 21.5 - button.frame.height / 2))
-        }
     }
 
     private final class ChromeView: NSView {

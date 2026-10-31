@@ -83,16 +83,19 @@ Depends: S-003
 
 Acceptance:
 - [snap] The full screenshot is visible at a useful fit-to-window scale.
-- [snap] Copy, Save, markup tools, and a drag handle are visible without opening a secondary window.
+- [snap] The title bar shows Copy and Save icons followed by markup tools; a discreet drag icon sits at the bottom.
+- [manual] Without Screen Recording Permission, the editor shows a blank screenshot and keeps all toolbar icons visible; markup tools remain usable, while Copy, Save, and drag are disabled.
+- [manual] A permission message and an Open Settings action appear at the bottom of the editor.
+- [manual] Open Settings hides the floating editor so System Settings is visible.
 - [manual] Closing the editor discards an unsaved capture after a clear prompt only if edits would otherwise be lost; Escape closes an untouched capture.
 - [manual] Reopening the editor is not required to copy or save a capture.
 
 UX:
-- Flow: capture completes -> Floating Editor shows the image -> choose a markup tool, Copy, Save, drag the handle, or close.
+- Flow: capture completes -> Floating Editor shows the image -> choose Copy, Save, a markup tool, drag the bottom handle, or close.
 - Surface: floating panel kept beside the work, because the user needs to inspect the screenshot and act on it.
-- States: capture appears immediately; an empty editor is never shown; if display capture fails, show the issue and a permission action in the panel.
-- Words: the editor identifies the capture mode in its top strip; actions "Copy", "Save…", "Close".
-- Access: toolbar actions have keyboard shortcuts and VoiceOver labels; Escape closes when no edit is in progress; window can be moved without blocking the screenshot.
+- States: capture appears immediately; without Screen Recording Permission, a blank screenshot remains available for markup testing and the permission message appears at the bottom with an Open Settings action that hides the floating editor.
+- Words: no capture-mode title; title bar actions "Copy", "Save…", followed by markup tools; bottom drag handle has no visible label; bottom status "Screen Recording permission required" and action "Open Settings".
+- Access: title bar actions have keyboard shortcuts, tooltips, and VoiceOver labels; Escape closes when no edit is in progress; window can be moved without blocking the screenshot.
 
 Status: done
 
@@ -153,6 +156,7 @@ Depends: S-004
 
 Acceptance:
 - [manual] Save opens the macOS save panel with a timestamped filename and PNG format selected.
+- [manual] The save panel appears as a sheet in front of the Floating Editor.
 - [manual] Saving writes the visible screenshot and markup to the chosen local folder.
 - [manual] Cancel returns to the editor without losing the capture or edits.
 - [manual] Save works offline and makes no network request.
@@ -168,7 +172,7 @@ Status: done
 
 ### S-008 Drag a screenshot to the Desktop or a folder
 
-As the user, I drag the file handle from the Floating Editor to the Desktop or a folder to create a PNG there.
+As the user, I drag the icon-only handle at the bottom of the Floating Editor to the Desktop or a folder to create a PNG there.
 
 Screens: 06-floating-editor.png
 
@@ -181,11 +185,11 @@ Acceptance:
 - [snap] The drag handle has a visible label and a tooltip explaining that it creates a file.
 
 UX:
-- Flow: drag "Drag to Save" handle -> hover over Desktop/folder -> release to create PNG; cancel by returning to the editor.
+- Flow: drag bottom handle -> hover over Desktop/folder -> release to create PNG; cancel by returning to the editor.
 - Surface: drag handle in the Floating Editor, the lightest interaction for creating a file in a chosen destination.
 - States: handle shows a ready cursor while dragging over a valid destination; cancel returns to the editor with no change.
-- Words: "Drag to Save"; tooltip "Create a PNG file from this screenshot".
-- Access: the same screenshot can also be saved with the Save… action; VoiceOver identifies the handle and its action.
+- Words: no visible label; tooltip "Drag this screenshot to create a PNG file".
+- Access: the same screenshot can also be saved with the Save… action; VoiceOver identifies the handle as "Drag to Save" and explains that it creates a PNG file.
 
 Status: done
 
