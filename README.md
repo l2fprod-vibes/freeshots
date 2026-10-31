@@ -28,9 +28,9 @@ Freeshots is distributed outside the Mac App Store through GitHub Releases and t
 brew install --cask l2fprod/tap/freeshots
 ```
 
-Each push to `main` builds a universal Intel and Apple Silicon app, signs and notarizes it, and uploads a downloadable ZIP as a GitHub Actions artifact for 14 days. Open the successful workflow run under **Actions** and download its `Freeshots-main-<commit>` artifact.
+Each branch has its own rolling prerelease. For example, pushes to `main` update [Freeshots main](https://github.com/l2fprod/freeshots/releases/tag/main), and pushes to a `dev` branch update [Freeshots dev](https://github.com/l2fprod/freeshots/releases/tag/dev). Each branch release includes a universal, signed, notarized ZIP from its latest successful build. Branch builds never update Homebrew.
 
-To publish a Homebrew release, push a version tag such as `v0.2.0`. Tagged builds attach a versioned ZIP to a GitHub Release and update the Cask in the tap. Main builds never update Homebrew.
+To publish a stable Homebrew release, push a version tag such as `v0.2.0`. Tagged builds attach a versioned ZIP to a GitHub Release and update the Cask in the tap. Main builds never update Homebrew.
 
 Before the first release, create a public `l2fprod/homebrew-tap` GitHub repository with a `Casks` directory. The workflow pushes the generated Cask there. Configure these Actions repository variables in Freeshots:
 

@@ -3,12 +3,16 @@ name: Release
 on:
   push:
     branches:
-      - main
+      - "**"
     tags:
       - "v*"
 
 permissions:
   contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -90,8 +94,8 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
             ZIP_NAME="Freeshots-${VERSION}.zip"
           else
-            SHORT_SHA="${GITHUB_SHA:0:7}"
-            ZIP_NAME="Freeshots-main-${SHORT_SHA}.zip"
+            ASSET_CHANNEL="${GITHUB_REF_NAME//\//-}"
+            ZIP_NAME="Freeshots-${ASSET_CHANNEL}.zip"
           fi
           KEYCHAIN_PATH="$RUNNER_TEMP/freeshots-signing.keychain-db"
           mkdir -p dist
@@ -106,16 +110,33 @@ jobs:
           ditto -c -k --keepParent build/Freeshots.app "dist/${ZIP_NAME}"
           shasum -a 256 "dist/${ZIP_NAME}" > "dist/${ZIP_NAME}.sha256"
 
-      - name: Upload main build artifact
+      - name: Publish rolling branch prerelease
         if: github.ref_type == 'branch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Freeshots-main-${{ github.sha }}
-          path: |
-            dist/Freeshots-main-*.zip
-            dist/Freeshots-main-*.zip.sha256
-          if-no-files-found: error
-          retention-days: 14
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          CHANNEL="$GITHUB_REF_NAME"
+          if [[ "$CHANNEL" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            CHANNEL="branch/${CHANNEL}"
+          fi
+          ASSET_CHANNEL="${CHANNEL//\//-}"
+          ZIP_NAME="Freeshots-${ASSET_CHANNEL}.zip"
+          NOTES_FILE="$RUNNER_TEMP/freeshots-${ASSET_CHANNEL}-notes.md"
+          printf 'Latest build from the `%s` branch.\n\nSource commit: `%s`.\n' "$CHANNEL" "$GITHUB_SHA" > "$NOTES_FILE"
+          git tag -f "$CHANNEL" "$GITHUB_SHA"
+          git push origin --force "refs/tags/${CHANNEL}"
+          if gh release view "$CHANNEL" >/dev/null 2>&1; then
+            gh release upload "$CHANNEL" \
+              "dist/${ZIP_NAME}" "dist/${ZIP_NAME}.sha256" --clobber
+            gh release edit "$CHANNEL" --title "Freeshots ${CHANNEL} (${SHORT_SHA})" \
+              --notes-file "$NOTES_FILE" --prerelease
+          else
+            gh release create "$CHANNEL" \
+              "dist/${ZIP_NAME}" "dist/${ZIP_NAME}.sha256" \
+              --title "Freeshots ${CHANNEL} (${SHORT_SHA})" --notes-file "$NOTES_FILE" \
+              --prerelease --latest=false --verify-tag
+          fi
 
       - name: Publish GitHub release
         if: github.ref_type == 'tag'
