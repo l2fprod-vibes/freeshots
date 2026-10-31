@@ -1,0 +1,11 @@
+cask "freeshots" do
+  version "__VERSION__"
+  sha256 "__SHA256__"
+
+  url "https://github.com/l2fprod/freeshots/releases/download/v#{version}/Freeshots-#{version}.zip"
+  name "Freeshots"
+  desc "Capture and annotate screenshots locally"
+  homepage "https://github.com/l2fprod/freeshots"
+
+  app "Freeshots.app"
+end
