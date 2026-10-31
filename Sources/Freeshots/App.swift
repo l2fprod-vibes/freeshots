@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import SwiftUI
 import UniformTypeIdentifiers
+import FreeshotsCore
 
 @main
 struct FreeshotsApp: App {
@@ -36,9 +37,23 @@ final class CaptureCoordinator {
     var captureError: String?
     var screenRecordingPermissionMissing = false
     var statusMessage: String?
+    var appearance = ScreenshotAppearance.defaults {
+        didSet { persistAppearance() }
+    }
+    private func persistAppearance() {
+        if let data = try? JSONEncoder().encode(appearance) {
+            UserDefaults.standard.set(data, forKey: "screenshotAppearance")
+        }
+    }
+
     var markup = MarkupDocument()
     private var savedAnnotations: [ScreenshotMark]?
     private var editorPanel: NSPanel?
+
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: "screenshotAppearance"),
+           let value = try? JSONDecoder().decode(ScreenshotAppearance.self, from: data) { appearance = value }
+    }
 
     func showFloatingEditor() {
         if let editorPanel {
@@ -53,6 +68,7 @@ final class CaptureCoordinator {
             defer: false
         )
         panel.title = requestedMode?.title ?? "Freeshots"
+        panel.minSize = NSSize(width: 960, height: 600)
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.hidesOnDeactivate = false
@@ -72,6 +88,29 @@ final class CaptureCoordinator {
         panel.makeKey()
     }
 
+    func showLastScreenshot() {
+        guard let data = UserDefaults.standard.data(forKey: "lastScreenshot"), let image = NSImage(data: data) else { return }
+        screenshot = image
+        requestedMode = nil
+        markup.reset()
+        statusMessage = nil
+        showFloatingEditor()
+    }
+
+    func writePreviewSnapshot(to url: URL) {
+        guard let editorPanel, let content = editorPanel.contentView,
+              let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { return }
+        content.cacheDisplay(in: content.bounds, to: bitmap)
+        guard let data = bitmap.representation(using: .png, properties: [:]) else { return }
+        try? data.write(to: url, options: .atomic)
+        let controls: [(String, NSWindow.ButtonType)] = [("close", .closeButton), ("minimize", .miniaturizeButton), ("zoom", .zoomButton)]
+        let report = "bundle=\(Bundle.main.bundleIdentifier ?? "nil")\n" + controls.map { name, type in
+            guard let button = editorPanel.standardWindowButton(type) else { return "\(name): missing" }
+            return "\(name): hidden=\(button.isHiddenOrHasHiddenAncestor), frame=\(button.frame), parent=\(String(describing: button.superview?.bounds))"
+        }.joined(separator: "\n")
+        try? report.write(to: url.appendingPathExtension("controls.txt"), atomically: true, encoding: .utf8)
+    }
+
     func capture(_ mode: CaptureMode, completion: @escaping @MainActor () -> Void) {
         if !markup.annotations.isEmpty, markup.annotations != savedAnnotations, !confirmClose() { return }
         let previousMode = requestedMode
@@ -89,6 +128,7 @@ final class CaptureCoordinator {
                     return
                 }
                 screenshot = image
+                if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), let data = image.tiffRepresentation { UserDefaults.standard.set(data, forKey: "lastScreenshot") }
                 requestedMode = mode
                 captureError = nil
                 screenRecordingPermissionMissing = false
@@ -121,7 +161,7 @@ final class CaptureCoordinator {
     }
 
     func copyScreenshot() {
-        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations) else {
+        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) else {
             statusMessage = "Unable to copy screenshot. Try again."
             return
         }
@@ -135,7 +175,7 @@ final class CaptureCoordinator {
     }
 
     func saveScreenshot() {
-        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations) else {
+        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) else {
             statusMessage = "Unable to save screenshot. Try again."
             return
         }
@@ -193,8 +233,8 @@ enum ScreenshotExport {
         return "Freeshots \(formatter.string(from: .now)).png"
     }
 
-    static func pngData(from image: NSImage, annotations: [ScreenshotMark] = []) -> Data? {
-        ScreenshotRenderer.pngData(image: image, annotations: annotations)
+    static func pngData(from image: NSImage, annotations: [ScreenshotMark] = [], appearance: ScreenshotAppearance = .defaults) -> Data? {
+        ScreenshotRenderer.pngData(image: image, annotations: annotations, appearance: appearance)
     }
 }
 
@@ -224,9 +264,10 @@ private struct CaptureMenu: View {
 
     @ViewBuilder
     private var menuContent: some View {
-        Button("Capture Area") { open(.area) }
+            Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }
         Button("Capture Display") { open(.display) }
+        if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), UserDefaults.standard.data(forKey: "lastScreenshot") != nil { Button("Show Last Screenshot") { coordinator.showLastScreenshot() } }
         Divider()
         Button("Settings…") { openSettings() }
             .keyboardShortcut(",", modifiers: .command)
@@ -244,6 +285,26 @@ private struct CaptureMenu: View {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        guard ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] == "1" else { return }
+        let image = NSImage(size: NSSize(width: 1200, height: 760))
+        image.lockFocus()
+        NSColor(calibratedRed: 0.94, green: 0.96, blue: 0.98, alpha: 1).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 1200, height: 760)).fill()
+        NSColor(calibratedRed: 0.30, green: 0.43, blue: 0.58, alpha: 1).setFill()
+        NSBezierPath(roundedRect: NSRect(x: 96, y: 106, width: 1008, height: 548), xRadius: 24, yRadius: 24).fill()
+        NSColor.white.withAlphaComponent(0.88).setFill()
+        NSBezierPath(roundedRect: NSRect(x: 152, y: 492, width: 896, height: 104), xRadius: 14, yRadius: 14).fill()
+        NSBezierPath(roundedRect: NSRect(x: 152, y: 332, width: 430, height: 116), xRadius: 14, yRadius: 14).fill()
+        NSBezierPath(roundedRect: NSRect(x: 618, y: 332, width: 430, height: 116), xRadius: 14, yRadius: 14).fill()
+        NSBezierPath(roundedRect: NSRect(x: 152, y: 168, width: 896, height: 116), xRadius: 14, yRadius: 14).fill()
+        image.unlockFocus()
+        CaptureCoordinator.shared.screenshot = image
+        CaptureCoordinator.shared.showFloatingEditor()
+        if let snapshotPath = ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_SNAPSHOT"] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                CaptureCoordinator.shared.writePreviewSnapshot(to: URL(fileURLWithPath: snapshotPath))
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

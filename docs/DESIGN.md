@@ -2,14 +2,14 @@
 
 ## Archetype
 
-Menu bar extra with capture overlays, a floating screenshot editor, and a Settings window. There is no persistent screenshot library or sidebar.
+Menu bar extra with capture overlays, a floating screenshot editor, and a Settings window. There is no persistent screenshot library or navigation sidebar; the editor uses an inspector alongside its canvas.
 
 ## Information architecture
 
-- **Menu bar:** Capture Area, Capture Window, Capture Display, Settings, Quit.
+- **Menu bar:** Capture Area, Capture Window, Capture Display, Show Last Screenshot when available, Settings, Quit.
 - **Capture overlay:** choose or confirm the screen content to capture; Escape cancels.
-- **Floating Editor:** review one screenshot, add markup, then Copy, Save, or drag the compact bottom handle.
-- **Settings:** Keyboard Shortcuts and Appearance.
+- **Floating Editor:** screenshot canvas with a persistent right inspector for markup and backdrop controls; Copy, Save, and Drag to Save are grouped at the top of the Inspector.
+- **Settings:** Keyboard Shortcuts, Editor preferences, and Privacy.
 
 ## Command map
 
@@ -25,7 +25,9 @@ Menu bar extra with capture overlays, a floating screenshot editor, and a Settin
 | Settings | Menu bar/app menu | Command-comma |
 | Quit | Menu bar/app menu | Command-Q |
 
-Markup tool shortcuts will be listed in the editor and configured in Settings. Defaults are a design call for the next pass.
+The editor uses a persistent Finder-style right side panel with a native material surface and no panel title. Its top action row groups Copy, Save, icon-only Undo/Redo, and Drag to Save. Markup tools and appearance settings follow. Native window controls retain AppKit placement. The screenshot canvas expands beside the inspector and previews changes immediately. Copy, Save, and Drag to Save share the same appearance model and sit together at the top of the Inspector.
+
+Markup tool shortcuts appear in the Inspector tooltips and work throughout the editor.
 
 ## Empty states
 
@@ -35,4 +37,4 @@ Markup tool shortcuts will be listed in the editor and configured in Settings. D
 
 ## Feeling
 
-Instant and focused. The screenshot stays central; capture controls and markup tools appear only when useful. The app gets a custom visual identity while keeping familiar Mac shortcuts, menus, save panels, and drag-and-drop behavior.
+Instant and focused. The screenshot stays central; its tools stay close in the inspector. The app gets a custom visual identity while keeping familiar Mac shortcuts, menus, save panels, and drag-and-drop behavior.

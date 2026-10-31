@@ -83,19 +83,19 @@ Depends: S-003
 
 Acceptance:
 - [snap] The full screenshot is visible at a useful fit-to-window scale.
-- [snap] The title bar shows Copy and Save icons followed by markup tools; a discreet drag icon sits at the bottom.
-- [manual] Without Screen Recording Permission, the editor shows a blank screenshot and keeps all toolbar icons visible; markup tools remain usable, while Copy, Save, and drag are disabled.
+- [snap] The Right panel starts with Copy, Save, icon-only Undo and Redo, and Drag to Save; no panel title is shown. Markup tools and appearance controls follow.
+- [manual] Without Screen Recording Permission, the editor shows a blank screenshot and keeps Inspector controls visible; markup tools remain usable, while Copy, Save, and Drag to Save are disabled.
 - [manual] A permission message and an Open Settings action appear at the bottom of the editor.
 - [manual] Open Settings hides the floating editor so System Settings is visible.
 - [manual] Closing the editor discards an unsaved capture after a clear prompt only if edits would otherwise be lost; Escape closes an untouched capture.
 - [manual] Reopening the editor is not required to copy or save a capture.
 
 UX:
-- Flow: capture completes -> Floating Editor shows the image -> choose Copy, Save, a markup tool, drag the bottom handle, or close.
+- Flow: capture completes -> Floating Editor shows the image -> Copy, Save, drag from the Inspector, choose a markup tool, or close.
 - Surface: floating panel kept beside the work, because the user needs to inspect the screenshot and act on it.
 - States: capture appears immediately; without Screen Recording Permission, a blank screenshot remains available for markup testing and the permission message appears at the bottom with an Open Settings action that hides the floating editor.
-- Words: no capture-mode title; title bar actions "Copy", "Save…", followed by markup tools; bottom drag handle has no visible label; bottom status "Screen Recording permission required" and action "Open Settings".
-- Access: title bar actions have keyboard shortcuts, tooltips, and VoiceOver labels; Escape closes when no edit is in progress; window can be moved without blocking the screenshot.
+- Words: no capture-mode title; Inspector actions "Copy", "Save", and Drag to Save appear above markup tools; bottom status "Screen Recording permission required" and action "Open Settings".
+- Access: Inspector actions have keyboard shortcuts, tooltips, and VoiceOver labels; Escape closes when no edit is in progress; window can be moved without blocking the screenshot.
 
 Status: done
 
@@ -139,7 +139,7 @@ Acceptance:
 
 UX:
 - Flow: select Copy or press its shortcut -> PNG is placed on the clipboard -> "Copied" appears -> editor remains open.
-- Surface: toolbar action in the Floating Editor.
+- Surface: action row at the top of the Inspector.
 - States: success is confirmed inline; clipboard failure leaves the editor open and explains the retry action.
 - Words: "Copy", "Copied", "Unable to copy screenshot. Try again.".
 - Access: Copy has a keyboard shortcut, VoiceOver label, and tooltip; confirmation is also announced to VoiceOver.
@@ -179,19 +179,56 @@ Screens: 06-floating-editor.png
 Depends: S-004
 
 Acceptance:
-- [manual] Dragging the labeled file handle to the Desktop or a Finder folder creates a PNG with the current markup.
+- [manual] Dragging the Inspector handle to the Desktop or a Finder folder creates a PNG with the current markup.
 - [manual] The suggested filename is timestamped and receives a unique suffix if that name already exists at the destination.
 - [manual] Canceling a drag leaves the Floating Editor and screenshot unchanged.
-- [snap] The drag handle has a visible label and a tooltip explaining that it creates a file.
+- [snap] The drag handle has a tooltip explaining that it creates a file.
 
 UX:
-- Flow: drag bottom handle -> hover over Desktop/folder -> release to create PNG; cancel by returning to the editor.
-- Surface: drag handle in the Floating Editor, the lightest interaction for creating a file in a chosen destination.
+- Flow: drag the Inspector handle -> hover over Desktop/folder -> release to create PNG; cancel by returning to the editor.
+- Surface: drag handle at the top of the Inspector, the lightest interaction for creating a file in a chosen destination.
 - States: handle shows a ready cursor while dragging over a valid destination; cancel returns to the editor with no change.
-- Words: no visible label; tooltip "Drag this screenshot to create a PNG file".
+- Words: accessibility label "Drag to Save"; tooltip "Drag this screenshot to create a PNG file".
 - Access: the same screenshot can also be saved with the Save… action; VoiceOver identifies the handle as "Drag to Save" and explains that it creates a PNG file.
 
 Status: done
+
+### S-009 Style screenshots and markups
+
+As the user, I choose a markup color and style the screenshot against a configurable backdrop before copying, saving, or dragging it.
+
+Acceptance:
+- Markup color can be changed from a circular control in the Inspector; new marks default to red.
+- The color control offers common swatches first and a custom macOS color picker.
+- A persistent right inspector shows the Markup and Backdrop sections together.
+- Backdrop presets preview solid, gradient, and textured backgrounds as I choose them.
+- Padding, corner radius, shadow blur, and shadow opacity have adjustable values.
+- Optional Mac and phone frames are mutually exclusive.
+- Copy, Save, drag, and the editor preview use the same appearance settings.
+
+UX:
+- Flow: choose a markup tool and color in Inspector -> choose a backdrop -> adjust its visible settings -> Copy, Save, or drag exports the preview.
+- Surface: persistent right inspector (details of the screenshot while people keep working). The circular color menu opens beside the Markup section.
+- States: default is transparent background with adjustable padding and shadow; Reset restores defaults; preview updates while settings change.
+- Words: “Markup Color”, “Custom Color”, “Backdrop”, “Background”, “Padding”, “Corners”, “Shadow”, “Blur”, “Opacity”, “Device Frame”, “Reset”.
+- Access: color swatches and all backdrop controls are keyboard accessible and VoiceOver labeled.
+
+### S-010 Reopen the last screenshot
+
+As the user, I can choose whether Freeshots remembers the latest capture and reopen it from the menu bar.
+
+Acceptance:
+- Remember Last Screenshot is enabled by default and can be turned off in Settings.
+- The last capture is stored only on this Mac.
+- Show Last Screenshot appears in the menu bar menu when a remembered capture exists.
+- Choosing it opens the Floating Editor with the remembered image.
+
+UX:
+- Flow: enable Remember Last Screenshot in Settings -> capture -> menu bar item -> Show Last Screenshot -> editor opens.
+- Surface: Settings toggle and menu bar command (toggle is one preference; command is an entry point).
+- States: command is absent when no screenshot is stored or remembering is disabled.
+- Words: “Remember Last Screenshot”, “Show Last Screenshot”.
+- Access: both controls are keyboard navigable and VoiceOver labeled.
 
 ## Later
 

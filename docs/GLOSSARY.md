@@ -16,4 +16,17 @@
 | Redact | Cover pixels so exported screenshots cannot reveal them | blur, hide |
 | Copy | Put the current screenshot on the clipboard | export |
 | Save | Write the current screenshot as a local PNG file | export |
-| Drag to Save | Create a local PNG by dragging the compact bottom handle to a destination | drag out |
+| Drag to Save | Create a local PNG by dragging the handle at the top of the Inspector to a destination | drag out |
+| Markup Color | Color used by new editable marks | ink |
+| Remember Last Screenshot | Keep the latest capture locally for reopening | history |
+| Show Last Screenshot | Open the latest remembered capture in the Floating Editor | recent capture |
+| Backdrop | Background, padding, corners, and shadow around a screenshot | template |
+| Device Frame | Mac or phone frame around a screenshot | mockup |
+| Custom Color | A color selected with the macOS color picker | custom ink |
+| Padding | Clear or colored inset around a screenshot | margin |
+| Corners | Screenshot edge radius | roundness |
+| Shadow | Soft edge behind a screenshot | glow |
+| Blur | Shadow softness amount | softness |
+| Opacity | Shadow darkness amount | intensity |
+| Reset | Restore default Backdrop settings | clear |
+| Inspector | Persistent side panel for markup tools and screenshot appearance | sidebar |

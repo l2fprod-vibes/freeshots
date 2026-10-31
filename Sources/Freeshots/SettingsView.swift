@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(HotkeyCenter.self) private var hotkeys
     @State private var recordingMode: CaptureMode?
     @State private var screenRecordingAllowed = CGPreflightScreenCaptureAccess()
+    @AppStorage("rememberLastScreenshot") private var rememberLastScreenshot = true
 
     var body: some View {
         Form {
@@ -44,6 +45,11 @@ struct SettingsView: View {
                     recordingMode = nil
                 }
             }
+            Section("Editor") {
+                Toggle("Remember Last Screenshot", isOn: $rememberLastScreenshot)
+                Text("Keep the most recent capture on this Mac so it can be reopened from the menu bar.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Privacy") {
                 Label(
                     screenRecordingAllowed ? "Screen Recording allowed" : "Screen Recording required",
@@ -62,6 +68,9 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .padding(20)
         .frame(width: 440)
+        .onChange(of: rememberLastScreenshot) { _, enabled in
+            if !enabled { UserDefaults.standard.removeObject(forKey: "lastScreenshot") }
+        }
         .task {
             while !Task.isCancelled {
                 screenRecordingAllowed = CGPreflightScreenCaptureAccess()

@@ -1,6 +1,7 @@
 import AppKit
 import Observation
 import SwiftUI
+import FreeshotsCore
 
 enum MarkupTool: String, CaseIterable, Identifiable {
     case select, arrow, shape, text, pen, redact
@@ -47,6 +48,7 @@ struct ScreenshotMark: Identifiable, Equatable {
     var end: CGPoint
     var points: [CGPoint] = []
     var text = ""
+    var colorHex = "E53935"
 
     var normalizedBounds: CGRect {
         if tool == .pen, !points.isEmpty {
@@ -73,6 +75,7 @@ struct ScreenshotMark: Identifiable, Equatable {
 final class MarkupDocument {
     var annotations: [ScreenshotMark] = []
     var activeTool: MarkupTool = .select
+    var activeColorHex = "E53935"
     var selectedID: UUID?
     @ObservationIgnored private var undoStack: [[ScreenshotMark]] = []
     @ObservationIgnored private var redoStack: [[ScreenshotMark]] = []
@@ -136,6 +139,7 @@ final class MarkupDocument {
 
 struct MarkupCanvas: View {
     let image: NSImage
+    let appearance: ScreenshotAppearance
     @Environment(MarkupDocument.self) private var markup
     @State private var draft: ScreenshotMark?
     @State private var movingID: UUID?
@@ -144,12 +148,26 @@ struct MarkupCanvas: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let imageRect = fittedRect(image.size, in: geometry.size)
+            let layout = fittedRects(image.size, in: geometry.size)
+            let imageRect = layout.image
             ZStack(alignment: .topLeading) {
+                BackdropPreview(preset: appearance.backdrop)
+                    .frame(width: layout.backdrop.width, height: layout.backdrop.height)
+                    .clipShape(RoundedRectangle(cornerRadius: appearance.cornerRadius * layout.scale, style: .continuous))
+                    .position(x: layout.backdrop.midX, y: layout.backdrop.midY)
+                if appearance.frame != .none {
+                    RoundedRectangle(cornerRadius: appearance.frame == .phone ? 48 * layout.scale : 18 * layout.scale)
+                        .fill(Color(white: 0.08))
+                        .frame(width: layout.frame.width, height: layout.frame.height)
+                        .position(x: layout.frame.midX, y: layout.frame.midY)
+                }
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: imageRect.width, height: imageRect.height)
+                    .clipShape(RoundedRectangle(cornerRadius: appearance.cornerRadius * layout.scale, style: .continuous))
+                    .shadow(color: .black.opacity(appearance.shadowEnabled ? appearance.shadowOpacity : 0),
+                            radius: appearance.shadowBlur * layout.scale, y: appearance.shadowBlur * layout.scale * 0.35)
                     .position(x: imageRect.midX, y: imageRect.midY)
                 ForEach(markup.annotations) { mark in
                     markView(mark, in: imageRect, selected: mark.id == markup.selectedID)
@@ -175,13 +193,26 @@ struct MarkupCanvas: View {
         }
     }
 
-    private func fittedRect(_ imageSize: CGSize, in size: CGSize) -> CGRect {
-        guard imageSize.width > 0, imageSize.height > 0 else { return .zero }
-        let scale = min(size.width / imageSize.width, size.height / imageSize.height)
-        let fitted = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        return CGRect(x: (size.width - fitted.width) / 2,
-                      y: (size.height - fitted.height) / 2,
-                      width: fitted.width, height: fitted.height)
+    private func fittedRects(_ imageSize: CGSize, in size: CGSize) -> (image: CGRect, backdrop: CGRect, frame: CGRect, scale: CGFloat) {
+        guard imageSize.width > 0, imageSize.height > 0 else { return (.zero, .zero, .zero, 1) }
+        let pad = CGFloat(max(0, appearance.padding))
+        let shadowInset: CGFloat = appearance.shadowEnabled ? CGFloat(max(0, appearance.shadowBlur)) * 2 : 0
+        let frameSide: CGFloat = appearance.frame == .none ? 0 : appearance.frame == .phone ? 22 : 14
+        let frameTop: CGFloat = appearance.frame == .none ? 0 : appearance.frame == .phone ? 42 : 28
+        let scale = min(size.width / (imageSize.width + 2 * (pad + frameSide + shadowInset)),
+                        size.height / (imageSize.height + 2 * (pad + frameSide + shadowInset) + frameTop))
+        let inset = (pad + frameSide) * scale
+        let image = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
+        let backdropSize = CGSize(width: image.width + inset * 2, height: image.height + inset * 2 + frameTop * scale)
+        let totalSize = CGSize(width: backdropSize.width + 2 * shadowInset * scale,
+                               height: backdropSize.height + 2 * shadowInset * scale)
+        let backdrop = CGRect(x: (size.width - totalSize.width) / 2 + shadowInset * scale,
+                              y: (size.height - totalSize.height) / 2 + shadowInset * scale,
+                              width: backdropSize.width, height: backdropSize.height)
+        let imageRect = CGRect(x: backdrop.minX + inset, y: backdrop.minY + inset,
+                               width: image.width, height: image.height)
+        let frame = imageRect.insetBy(dx: -frameSide * scale, dy: -frameSide * scale).insetBy(dx: 0, dy: -frameTop * scale / 2)
+        return (imageRect, backdrop, frame, scale)
     }
 
     private func normalized(_ point: CGPoint, in rect: CGRect) -> CGPoint {
@@ -208,7 +239,7 @@ struct MarkupCanvas: View {
 
         if draft == nil {
             draft = ScreenshotMark(tool: markup.activeTool, start: point, end: point,
-                                   points: markup.activeTool == .pen ? [point] : [])
+                                   points: markup.activeTool == .pen ? [point] : [], colorHex: markup.activeColorHex)
         } else {
             draft?.end = point
             if markup.activeTool == .pen { draft?.points.append(point) }
@@ -249,17 +280,9 @@ struct MarkupCanvas: View {
         ZStack(alignment: .topLeading) {
             switch mark.tool {
             case .arrow:
-                Path { path in
-                    let angle = atan2(end.y - start.y, end.x - start.x)
-                    let head: CGFloat = 12
-                    let left = CGPoint(x: end.x - head * cos(angle - .pi / 6), y: end.y - head * sin(angle - .pi / 6))
-                    let right = CGPoint(x: end.x - head * cos(angle + .pi / 6), y: end.y - head * sin(angle + .pi / 6))
-                    path.move(to: start); path.addLine(to: end)
-                    path.move(to: left); path.addLine(to: end); path.addLine(to: right)
-                }
-                .stroke(Ink.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                ArrowMark(start: start, end: end, lineWidth: max(5, rect.width * 0.012), colorHex: mark.colorHex)
             case .shape:
-                Rectangle().stroke(Ink.accent, lineWidth: 3).frame(width: bounds.width, height: bounds.height)
+                Rectangle().stroke(markColor(mark.colorHex), lineWidth: 3).frame(width: bounds.width, height: bounds.height)
                     .position(x: bounds.midX, y: bounds.midY)
             case .redact:
                 Rectangle().fill(Color.black).frame(width: max(12, bounds.width), height: max(12, bounds.height))
@@ -271,11 +294,11 @@ struct MarkupCanvas: View {
                     path.move(to: first)
                     points.dropFirst().forEach { path.addLine(to: $0) }
                 }
-                .stroke(Ink.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .stroke(markColor(mark.colorHex), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             case .text:
                 Text(mark.text)
                     .font(.system(size: max(16, rect.width * 0.035), weight: .semibold))
-                    .foregroundStyle(Ink.accent)
+                    .foregroundStyle(markColor(mark.colorHex))
                     .position(start)
             case .select:
                 EmptyView()
@@ -293,5 +316,76 @@ struct MarkupCanvas: View {
 
     private func canvasPoint(_ point: CGPoint, in rect: CGRect) -> CGPoint {
         CGPoint(x: point.x * rect.width, y: point.y * rect.height)
+    }
+
+    private func markColor(_ hex: String) -> Color { Color(nsColor: NSColor(hex: hex) ?? .systemRed) }
+}
+
+struct ArrowMark: View {
+    let start: CGPoint
+    let end: CGPoint
+    let lineWidth: CGFloat
+    let colorHex: String
+    var body: some View {
+        let angle = atan2(end.y - start.y, end.x - start.x)
+        let headLength = max(18, lineWidth * 4)
+        let halfWidth = lineWidth * 1.5
+        let base = CGPoint(x: end.x - headLength * cos(angle), y: end.y - headLength * sin(angle))
+        let left = CGPoint(x: base.x + halfWidth * sin(angle), y: base.y - halfWidth * cos(angle))
+        let right = CGPoint(x: base.x - halfWidth * sin(angle), y: base.y + halfWidth * cos(angle))
+        Path { path in
+            path.move(to: start); path.addLine(to: base)
+            path.move(to: left); path.addLine(to: end); path.addLine(to: right)
+        }.stroke(Color(nsColor: NSColor(hex: colorHex) ?? .systemRed),
+                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+    }
+}
+
+extension NSColor {
+    convenience init?(hex: String) {
+        guard let value = UInt32(hex, radix: 16) else { return nil }
+        self.init(calibratedRed: CGFloat((value >> 16) & 255) / 255,
+                  green: CGFloat((value >> 8) & 255) / 255,
+                  blue: CGFloat(value & 255) / 255, alpha: 1)
+    }
+    var hexString: String {
+        let color = usingColorSpace(.deviceRGB) ?? .systemRed
+        return String(format: "%02X%02X%02X", Int(color.redComponent * 255), Int(color.greenComponent * 255), Int(color.blueComponent * 255))
+    }
+}
+
+
+struct BackdropPreview: View {
+    let preset: BackdropPreset
+    var body: some View {
+        ZStack {
+            if preset.colors.isEmpty {
+                Color.clear
+            } else {
+                LinearGradient(colors: preset.colors.compactMap { NSColor(hex: $0).map { Color(nsColor: $0) } },
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            if preset.texture {
+                Canvas { context, size in
+                    let step: CGFloat = preset == .blueprint ? 32 : 7
+                    if preset == .blueprint {
+                        for x in stride(from: 0, through: size.width, by: step) {
+                            var path = Path(); path.move(to: CGPoint(x: x, y: 0)); path.addLine(to: CGPoint(x: x, y: size.height))
+                            context.stroke(path, with: .color(.white.opacity(0.16)), lineWidth: 1)
+                        }
+                        for y in stride(from: 0, through: size.height, by: step) {
+                            var path = Path(); path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: size.width, y: y))
+                            context.stroke(path, with: .color(.white.opacity(0.16)), lineWidth: 1)
+                        }
+                    } else {
+                        for x in stride(from: 0, through: size.width, by: step) {
+                            for y in stride(from: 0, through: size.height, by: step) {
+                                context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)), with: .color(.white.opacity(0.10)))
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

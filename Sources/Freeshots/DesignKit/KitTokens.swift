@@ -40,8 +40,8 @@ enum KitMetric {
     static let actionHeight: CGFloat = 32
     static let controlRadius: CGFloat = 10
     static let panelRadius: CGFloat = 18
-    static let editorWidth: CGFloat = 860
-    static let editorHeight: CGFloat = 600
+    static let editorWidth: CGFloat = 1120
+    static let editorHeight: CGFloat = 720
 }
 
 enum KitMotion {
