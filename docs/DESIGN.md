@@ -2,13 +2,13 @@
 
 ## Archetype
 
-Menu bar extra with capture overlays, a floating screenshot editor, and a Settings window. There is no persistent screenshot library or navigation sidebar; the editor uses an inspector alongside its canvas.
+Menu bar extra with capture overlays, a floating screenshot editor, and a Settings window. There is no persistent screenshot library or navigation sidebar; the editor uses a compact toolbar with visual Background and Aspect Ratio popovers, a Device Frame menu, and a Fine Tune popover.
 
 ## Information architecture
 
-- **Menu bar:** Capture Area, Capture Window, Capture Display, Show Last Screenshot when available, Settings, Quit.
+- **Menu bar:** Open Image, Capture Area, Capture Window, Capture Display, Show Last Screenshot when available, Settings, Quit.
 - **Capture overlay:** choose or confirm the screen content to capture; Escape cancels.
-- **Floating Editor:** screenshot canvas with a persistent right inspector for markup and backdrop controls; Copy, Save, and Drag to Save are grouped at the top of the Inspector.
+- **Floating Editor:** full-width screenshot canvas beneath a compact toolbar. Markup, history, and color lead; Background, Aspect Ratio, Device Frame, and Fine Tune follow Undo/Redo behind a separator; Copy, Save, and drag stay at the trailing end. Background and Aspect Ratio open visual previews, and Fine Tune opens an anchored popover.
 - **Settings:** Keyboard Shortcuts, Editor preferences, and Privacy.
 
 ## Command map
@@ -25,9 +25,9 @@ Menu bar extra with capture overlays, a floating screenshot editor, and a Settin
 | Settings | Menu bar/app menu | Command-comma |
 | Quit | Menu bar/app menu | Command-Q |
 
-The editor uses a persistent Finder-style right side panel with a native material surface and no panel title. Its top action row groups Copy, Save, icon-only Undo/Redo, and Drag to Save. Markup tools and appearance settings follow. Native window controls retain AppKit placement. The screenshot canvas expands beside the inspector and previews changes immediately. Copy, Save, and Drag to Save share the same appearance model and sit together at the top of the Inspector.
+The editor uses a compact top toolbar above a full-width screenshot canvas. It groups markup tools, color, and Undo/Redo, then icon-only styling actions with visual popovers for Background and Aspect Ratio, a Device Frame menu, and Fine Tune controls. Fine Tune settings appear in a native popover only while needed. The image remains the visual center without a permanent side panel. Copy, Save, and Drag to Save use the same renderer as the editor composition.
 
-Markup tool shortcuts appear in the Inspector tooltips and work throughout the editor.
+Markup tool shortcuts appear in toolbar tooltips and work throughout the editor.
 
 ## Empty states
 
@@ -37,4 +37,4 @@ Markup tool shortcuts appear in the Inspector tooltips and work throughout the e
 
 ## Feeling
 
-Instant and focused. The screenshot stays central; its tools stay close in the inspector. The app gets a custom visual identity while keeping familiar Mac shortcuts, menus, save panels, and drag-and-drop behavior.
+Instant and focused. The screenshot stays central; frequent tools sit in one predictable toolbar, while occasional styling controls stay one click away. The app keeps familiar Mac shortcuts, menus, save panels, and drag-and-drop behavior.

@@ -1,6 +1,6 @@
 # Freeshots design system
 
-Freeshots uses the macOS accent for standard menus and controls. The custom floating editor and markup tools use the Freeshots palette in `design/KIT.md`.
+Freeshots uses semantic macOS colors and the user's system accent throughout the floating editor. Token definitions are in `Sources/Freeshots/DesignKit/KitTokens.swift` and documented in `design/KIT.md`.
 
 ## `Sources/Freeshots/UI/Theme.swift`
 
@@ -10,7 +10,7 @@ Freeshots uses the macOS accent for standard menus and controls. The custom floa
 ## Surfaces and controls
 
 - Use system menus, save panels, buttons, and text fields.
-- Use the custom meaning tokens in `DesignKit/KitTokens.swift` for editor chrome and markup tools.
+- Use semantic meaning tokens in `DesignKit/KitTokens.swift` for editor chrome and markup tools; do not hard-code chrome colors.
 - Keep screenshot pixels unmodified until the user adds markup.
 
 ## Layout and motion

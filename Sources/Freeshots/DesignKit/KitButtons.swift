@@ -79,7 +79,7 @@ private struct KitToolButtonBody: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: KitMetric.controlRadius, style: .continuous)
         configuration.label
-            .foregroundStyle(state == .selected ? Ink.accentText : Ink.text)
+            .foregroundStyle(state == .selected ? Ink.selectionText : Ink.text)
             .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
             .background(fill, in: shape)
             .overlay(shape.strokeBorder(state == .focused ? Ink.accentText : .clear, lineWidth: 2))

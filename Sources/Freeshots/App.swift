@@ -3,6 +3,7 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 import FreeshotsCore
+import FreeshotsRendering
 
 @main
 struct FreeshotsApp: App {
@@ -34,11 +35,14 @@ final class CaptureCoordinator {
     static let shared = CaptureCoordinator()
     var requestedMode: CaptureMode?
     var screenshot: NSImage?
+    var screenshotName = ScreenshotExport.defaultName
     var captureError: String?
     var screenRecordingPermissionMissing = false
     var statusMessage: String?
     var appearance = ScreenshotAppearance.defaults {
-        didSet { persistAppearance() }
+        didSet {
+            if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] != "1" { persistAppearance() }
+        }
     }
     private func persistAppearance() {
         if let data = try? JSONEncoder().encode(appearance) {
@@ -56,6 +60,8 @@ final class CaptureCoordinator {
     }
 
     func showFloatingEditor() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
         if let editorPanel {
             editorPanel.orderFrontRegardless()
             editorPanel.makeKey()
@@ -63,18 +69,18 @@ final class CaptureCoordinator {
         }
         let panel = FloatingEditorPanel(
             contentRect: NSRect(x: 0, y: 0, width: KitMetric.editorWidth, height: KitMetric.editorHeight),
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
-        panel.title = requestedMode?.title ?? "Freeshots"
+        panel.title = screenshotName
         panel.minSize = NSSize(width: 960, height: 600)
-        panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.isFloatingPanel = false
+        panel.level = .normal
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.titlebarAppearsTransparent = true
-        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = false
+        panel.titleVisibility = .visible
         panel.isReleasedWhenClosed = false
         let content: AnyView = KitGallery.enabled
             ? AnyView(KitGallery())
@@ -82,19 +88,60 @@ final class CaptureCoordinator {
         panel.contentView = NSHostingView(rootView: content.environment(self).environment(markup).themed())
         panel.delegate = panel
         panel.shouldCloseHandler = { [weak self] in self?.confirmClose() ?? true }
+        panel.didCloseHandler = { [weak self] in self?.editorDidClose(panel) }
         editorPanel = panel
         panel.center()
         panel.orderFrontRegardless()
         panel.makeKey()
     }
 
+    private func editorDidClose(_ panel: FloatingEditorPanel) {
+        DispatchQueue.main.async {
+            let anotherWindowIsVisible = NSApp.windows.contains {
+                $0 !== panel && $0.isVisible && !$0.isMiniaturized
+            }
+            if !anotherWindowIsVisible {
+                NSApp.setActivationPolicy(.accessory)
+            }
+        }
+    }
+
     func showLastScreenshot() {
         guard let data = UserDefaults.standard.data(forKey: "lastScreenshot"), let image = NSImage(data: data) else { return }
         screenshot = image
+        screenshotName = UserDefaults.standard.string(forKey: "lastScreenshotName") ?? ScreenshotExport.defaultName
+        editorPanel?.title = screenshotName
         requestedMode = nil
         markup.reset()
         statusMessage = nil
         showFloatingEditor()
+    }
+
+    func openImage() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.prompt = "Open"
+        let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard response == .OK, let url = panel.url, let image = NSImage(contentsOf: url) else { return }
+            guard let self, self.confirmClose() else { return }
+            self.screenshot = image
+            self.screenshotName = url.deletingPathExtension().lastPathComponent
+            self.editorPanel?.title = self.screenshotName
+            self.requestedMode = nil
+            self.captureError = nil
+            self.screenRecordingPermissionMissing = false
+            self.statusMessage = nil
+            self.savedAnnotations = nil
+            self.markup.reset()
+            self.showFloatingEditor()
+        }
+        if let editorPanel, editorPanel.isVisible {
+            panel.beginSheetModal(for: editorPanel, completionHandler: completion)
+        } else {
+            panel.begin(completionHandler: completion)
+        }
     }
 
     func writePreviewSnapshot(to url: URL) {
@@ -109,6 +156,10 @@ final class CaptureCoordinator {
             return "\(name): hidden=\(button.isHiddenOrHasHiddenAncestor), frame=\(button.frame), parent=\(String(describing: button.superview?.bounds))"
         }.joined(separator: "\n")
         try? report.write(to: url.appendingPathExtension("controls.txt"), atomically: true, encoding: .utf8)
+        if let screenshot,
+           let export = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) {
+            try? export.write(to: url.appendingPathExtension("rendered.png"), options: .atomic)
+        }
     }
 
     func capture(_ mode: CaptureMode, completion: @escaping @MainActor () -> Void) {
@@ -128,7 +179,12 @@ final class CaptureCoordinator {
                     return
                 }
                 screenshot = image
-                if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), let data = image.tiffRepresentation { UserDefaults.standard.set(data, forKey: "lastScreenshot") }
+                screenshotName = mode == .window ? ScreenshotExport.capturedWindowName() : ScreenshotExport.defaultName
+                editorPanel?.title = screenshotName
+                if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), let data = image.tiffRepresentation {
+                    UserDefaults.standard.set(data, forKey: "lastScreenshot")
+                    UserDefaults.standard.set(screenshotName, forKey: "lastScreenshotName")
+                }
                 requestedMode = mode
                 captureError = nil
                 screenRecordingPermissionMissing = false
@@ -168,7 +224,7 @@ final class CaptureCoordinator {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         if pasteboard.setData(data, forType: .png) {
-            statusMessage = "Copied"
+            statusMessage = nil
         } else {
             statusMessage = "Unable to copy screenshot. Try again."
         }
@@ -181,14 +237,19 @@ final class CaptureCoordinator {
         }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = ScreenshotExport.suggestedFilename
+        panel.nameFieldStringValue = ScreenshotExport.filename(for: screenshotName)
         panel.canCreateDirectories = true
         let completion: (NSApplication.ModalResponse) -> Void = { [weak self] response in
             guard response == .OK, let destination = panel.url else { return }
             do {
                 try data.write(to: destination, options: .atomic)
+                self?.screenshotName = destination.deletingPathExtension().lastPathComponent
+                self?.editorPanel?.title = self?.screenshotName ?? destination.lastPathComponent
                 self?.savedAnnotations = self?.markup.annotations
                 self?.statusMessage = "Saved"
+                if UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true {
+                    UserDefaults.standard.set(self?.screenshotName, forKey: "lastScreenshotName")
+                }
             } catch {
                 self?.statusMessage = "Unable to save screenshot. Choose another location or try again."
             }
@@ -220,17 +281,45 @@ final class CaptureCoordinator {
 
 private final class FloatingEditorPanel: NSPanel, NSWindowDelegate {
     var shouldCloseHandler: (() -> Bool)?
+    var didCloseHandler: (() -> Void)?
 
     override func cancelOperation(_ sender: Any?) { close() }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { shouldCloseHandler?() ?? true }
+
+    func windowWillClose(_ notification: Notification) { didCloseHandler?() }
 }
 
 enum ScreenshotExport {
-    static var suggestedFilename: String {
+    static var defaultName: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        return "Freeshots \(formatter.string(from: .now)).png"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd 'at' h.mm.ss a"
+        return "Screenshot \(formatter.string(from: .now))"
+    }
+
+    static func filename(for name: String) -> String {
+        let cleanName = name
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(cleanName.isEmpty ? defaultName : cleanName).png"
+    }
+
+    static func capturedWindowName() -> String {
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        guard let window = windows.first(where: {
+            ($0[kCGWindowLayer as String] as? Int ?? 1) == 0 &&
+            ($0[kCGWindowOwnerPID as String] as? pid_t) != ProcessInfo.processInfo.processIdentifier
+        }) else { return defaultName }
+
+        let app = (window[kCGWindowOwnerPID as String] as? pid_t)
+            .flatMap(NSRunningApplication.init(processIdentifier:))
+        let appWindowTitle = window[kCGWindowName as String] as? String
+        let candidate = appWindowTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = candidate.flatMap { $0.isEmpty ? nil : $0 }
+        let appName = app?.localizedName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title ?? appName.flatMap { $0.isEmpty ? nil : $0 } ?? defaultName
     }
 
     static func pngData(from image: NSImage, annotations: [ScreenshotMark] = [], appearance: ScreenshotAppearance = .defaults) -> Data? {
@@ -264,7 +353,10 @@ private struct CaptureMenu: View {
 
     @ViewBuilder
     private var menuContent: some View {
-            Button("Capture Area") { open(.area) }
+        Button("Open Image…") { coordinator.openImage() }
+            .keyboardShortcut("o", modifiers: .command)
+        Divider()
+        Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }
         Button("Capture Display") { open(.display) }
         if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), UserDefaults.standard.data(forKey: "lastScreenshot") != nil { Button("Show Last Screenshot") { coordinator.showLastScreenshot() } }
@@ -283,8 +375,16 @@ private struct CaptureMenu: View {
 
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var permissionWindow: NSWindow?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        installApplicationMenu()
+        if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] != "1",
+           !CGPreflightScreenCaptureAccess(),
+           !UserDefaults.standard.bool(forKey: "permissionOnboardingSkipped") {
+            showPermissionOnboarding()
+        }
         guard ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] == "1" else { return }
         let image = NSImage(size: NSSize(width: 1200, height: 760))
         image.lockFocus()
@@ -299,6 +399,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         NSBezierPath(roundedRect: NSRect(x: 152, y: 168, width: 896, height: 116), xRadius: 14, yRadius: 14).fill()
         image.unlockFocus()
         CaptureCoordinator.shared.screenshot = image
+        if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_APPEARANCE"] == "1" {
+            CaptureCoordinator.shared.appearance.frame = .window
+            CaptureCoordinator.shared.appearance.aspectRatio = .sixteenByNine
+        }
         CaptureCoordinator.shared.showFloatingEditor()
         if let snapshotPath = ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_SNAPSHOT"] {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -309,5 +413,93 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    private func showPermissionOnboarding() {
+        NSApp.setActivationPolicy(.regular)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 280),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Screen Recording Access"
+        window.isReleasedWhenClosed = false
+        window.contentMinSize = NSSize(width: 500, height: 280)
+        window.contentMaxSize = NSSize(width: 500, height: 280)
+        window.center()
+        let hostingView = NSHostingView(rootView: PermissionOnboardingView(onFinish: { [weak self] skipped in
+            if skipped { UserDefaults.standard.set(true, forKey: "permissionOnboardingSkipped") }
+            self?.permissionWindow?.close()
+            self?.permissionWindow = nil
+            NSApp.setActivationPolicy(.accessory)
+        }))
+        hostingView.sizingOptions = []
+        window.contentView = hostingView
+        window.setContentSize(NSSize(width: 500, height: 280))
+        permissionWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func installApplicationMenu() {
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu(title: "Freeshots")
+        appMenu.addItem(NSMenuItem(title: "About Freeshots", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Hide Freeshots", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        appMenu.addItem(NSMenuItem(title: "Quit Freeshots", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+        NSApp.mainMenu = mainMenu
+    }
+}
+
+private struct PermissionOnboardingView: View {
+    let onFinish: (Bool) -> Void
+    @State private var allowed = CGPreflightScreenCaptureAccess()
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: allowed ? "checkmark.shield.fill" : "rectangle.dashed")
+                .font(.system(size: 36))
+                .foregroundStyle(allowed ? Ink.accentText : Ink.warning)
+            Text(allowed ? "Screen Recording is ready" : "Allow Screen Recording")
+                .font(.title2.weight(.semibold))
+            Text(allowed
+                 ? "Freeshots can capture your screen."
+                 : "Freeshots needs Screen Recording access to capture your screen. Allow it in System Settings, then return here. This window will continue automatically.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Skip for Now") { onFinish(true) }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                if !allowed {
+                    Button("Open System Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button("Continue") { onFinish(false) }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity)
+        .task {
+            while !Task.isCancelled && !allowed {
+                try? await Task.sleep(for: .seconds(1))
+                allowed = CGPreflightScreenCaptureAccess()
+                if allowed { onFinish(false) }
+            }
+        }
+        .onDisappear { if !allowed { onFinish(true) } }
     }
 }

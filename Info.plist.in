@@ -14,6 +14,5 @@
 <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSPrincipalClass</key><string>NSApplication</string>
-<key>LSUIElement</key><true/>
 <key>NSScreenCaptureUsageDescription</key><string>Freeshots uses Screen Recording access to capture the display, window, or area you choose.</string>
 </dict></plist>

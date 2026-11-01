@@ -16,23 +16,24 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            editorHeader
+            EditorToolbar(coordinator: coordinator, textFieldFocused: $textFieldFocused)
             Rectangle().fill(Ink.divider).frame(height: 1)
-
-            HStack(spacing: 0) {
-                MarkupCanvas(image: coordinator.screenshot ?? Self.emptyCanvasImage, appearance: coordinator.appearance)
-                    .padding(24)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Ink.canvas)
-                    .overlay(Rectangle().stroke(Ink.divider, lineWidth: 1).padding(24))
-
-                Rectangle().fill(Ink.divider).frame(width: 1)
-                EditorInspector(coordinator: coordinator, textFieldFocused: $textFieldFocused)
-                    .frame(width: 304)
-                    .background(.regularMaterial)
+            MarkupCanvas(image: coordinator.screenshot ?? Self.emptyCanvasImage, appearance: coordinator.appearance)
+                .padding(12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Ink.canvas)
+            if let statusMessage = coordinator.statusMessage {
+                HStack(spacing: 8) {
+                    Image(systemName: statusMessage.hasPrefix("Unable") ? "exclamationmark.triangle" : "checkmark.circle")
+                        .foregroundStyle(statusMessage.hasPrefix("Unable") ? Ink.warning : Ink.muted)
+                    Text(statusMessage).kitType(.meta).foregroundStyle(Ink.muted).lineLimit(1).help(statusMessage)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(Ink.surface)
+                .accessibilityAddTraits(.updatesFrequently)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
             if coordinator.captureError != nil {
                 Rectangle().fill(Ink.divider).frame(height: 1)
                 HStack {
@@ -51,176 +52,264 @@ struct ContentView: View {
                 .background(Ink.surface)
             }
         }
-        .background(WindowChrome())
-        .ignoresSafeArea()
-        .focusEffectDisabled()
         .onDeleteCommand { coordinator.markup.removeSelected() }
-    }
-
-    private var editorHeader: some View {
-        HStack(spacing: 8) {
-            Spacer(minLength: 8)
-            if let message = coordinator.statusMessage {
-                Text(message).kitType(.meta).foregroundStyle(Ink.muted).lineLimit(1)
-                    .accessibilityAddTraits(.updatesFrequently)
-            }
-        }
-        .padding(.leading, 84)
-        .padding(.trailing, 20)
-        .frame(height: 48)
-        .background(Ink.surface)
     }
 }
 
-private struct EditorInspector: View {
+private struct EditorToolbar: View {
     @Bindable var coordinator: CaptureCoordinator
     @FocusState.Binding var textFieldFocused: Bool
-    private let toolColumns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
-    private let backdropColumns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+    @State private var backgroundPresented = false
+    @State private var aspectRatioPresented = false
+    @State private var fineTunePresented = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(MarkupTool.allCases) { tool in
+                Button { coordinator.markup.activeTool = tool } label: {
+                    Image(systemName: tool.symbol)
+                        .font(.system(size: 15, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
+                }
+                .buttonStyle(KitToolButtonStyle(selected: coordinator.markup.activeTool == tool))
+                .help("Choose \(tool.title) (\(tool.shortcut))")
+                .accessibilityLabel(tool.title)
+                .accessibilityAddTraits(coordinator.markup.activeTool == tool ? .isSelected : [])
+                .keyboardShortcut(KeyEquivalent(tool.shortcut.lowercased().first!), modifiers: [])
+                .disabled(textFieldFocused)
+            }
+
+            ColorMenu(coordinator: coordinator)
+
+            if let mark = coordinator.markup.selectedMark, mark.tool == .text {
+                TextField("Text", text: Binding(
+                    get: { coordinator.markup.selectedMark?.text ?? "" },
+                    set: { coordinator.markup.updateSelectedText($0) }
+                ), onEditingChanged: { editing in
+                    if editing { coordinator.markup.selectedTextChanged() }
+                })
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+                .focused($textFieldFocused)
+                .accessibilityLabel("Edit selected text mark")
+            }
+            if coordinator.markup.selectedMark != nil {
+                toolButton("trash", title: "Remove selected mark", help: "Remove selected mark (Delete)") {
+                    coordinator.markup.removeSelected()
+                }
+            }
+
+            toolbarDivider
+
+            toolButton("arrow.uturn.backward", title: "Undo", help: "Undo (⌘Z)") { coordinator.markup.undo() }
+                .disabled(!coordinator.markup.canUndo)
+                .keyboardShortcut("z", modifiers: .command)
+            toolButton("arrow.uturn.forward", title: "Redo", help: "Redo (⇧⌘Z)") { coordinator.markup.redo() }
+                .disabled(!coordinator.markup.canRedo)
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+
+            toolbarDivider
+
+            Button { backgroundPresented = true } label: { Image(systemName: "paintpalette") }
+                .buttonStyle(KitToolButtonStyle(selected: backgroundPresented))
+                .help("Preview and choose a background")
+                .accessibilityLabel("Background")
+                .accessibilityValue(coordinator.appearance.backdrop.title)
+                .popover(isPresented: $backgroundPresented, arrowEdge: .bottom) {
+                    BackgroundPopover(coordinator: coordinator)
+                }
+            Button { aspectRatioPresented = true } label: { Image(systemName: "aspectratio") }
+                .buttonStyle(KitToolButtonStyle(selected: aspectRatioPresented))
+                .help("Preview and choose an aspect ratio")
+                .accessibilityLabel("Aspect Ratio")
+                .accessibilityValue(coordinator.appearance.aspectRatio.title)
+                .popover(isPresented: $aspectRatioPresented, arrowEdge: .bottom) {
+                    AspectRatioPopover(coordinator: coordinator,
+                                      imageSize: coordinator.screenshot?.size ?? CGSize(width: 16, height: 9))
+                }
+            appearanceMenu("Device Frame", symbol: "macwindow", selection: coordinator.appearance.frame.title) {
+                ForEach(DeviceFrame.allCases) { frame in
+                    Button(frame.title) { coordinator.appearance.frame = frame }
+                }
+            }
+            Button { fineTunePresented = true } label: { Image(systemName: "slider.horizontal.3") }
+                .buttonStyle(KitToolButtonStyle())
+                .help("Adjust fine tune settings")
+                .accessibilityLabel("Fine Tune")
+                .popover(isPresented: $fineTunePresented, arrowEdge: .bottom) {
+                    FineTunePopover(coordinator: coordinator)
+                }
+
+            Spacer(minLength: 8)
+
+            toolButton("doc.on.doc", title: "Copy screenshot", help: "Copy screenshot (⌘C)") {
+                coordinator.copyScreenshot()
+            }
+            .keyboardShortcut("c", modifiers: .command)
+            .disabled(coordinator.screenshot == nil)
+
+            toolButton("square.and.arrow.down", title: "Save screenshot", help: "Save screenshot (⌘S)") {
+                coordinator.saveScreenshot()
+            }
+            .keyboardShortcut("s", modifiers: .command)
+            .disabled(coordinator.screenshot == nil)
+
+            DragToSaveControl(dataProvider: {
+                guard let screenshot = coordinator.screenshot else { return nil }
+                return ScreenshotExport.pngData(from: screenshot, annotations: coordinator.markup.annotations, appearance: coordinator.appearance)
+            }, filename: ScreenshotExport.filename(for: coordinator.screenshotName))
+            .opacity(coordinator.screenshot == nil ? 0.4 : 1)
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 48)
+        .background(.regularMaterial)
+        .accessibilityLabel("Screenshot editing tools")
+    }
+
+    private var toolbarDivider: some View {
+        Rectangle().fill(Ink.divider).frame(width: 1, height: 24).padding(.horizontal, 4)
+    }
+
+    private func appearanceMenu<Content: View>(_ title: String, symbol: String, selection: String,
+                                               @ViewBuilder content: () -> Content) -> some View {
+        Menu(content: content) {
+            Image(systemName: symbol)
+        }
+        .menuIndicator(.hidden)
+        .menuStyle(.borderlessButton)
+        .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
+        .help("Choose \(title.lowercased()) (\(selection))")
+        .accessibilityLabel(title)
+        .accessibilityValue(selection)
+    }
+
+    private func toolButton(_ symbol: String, title: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: symbol) }
+            .buttonStyle(KitToolButtonStyle())
+            .help(help)
+            .accessibilityLabel(title)
+    }
+}
+
+private struct BackgroundPopover: View {
+    @Bindable var coordinator: CaptureCoordinator
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Background").font(.headline)
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(BackdropPreset.allCases) { preset in
+                    Button { coordinator.appearance.backdrop = preset } label: {
+                        VStack(spacing: 5) {
+                            BackdropPreview(preset: preset)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(.white.opacity(0.88))
+                                        .frame(width: 28, height: 18)
+                                        .shadow(color: .black.opacity(0.16), radius: 2, y: 1)
+                                }
+                                .frame(height: 48)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(coordinator.appearance.backdrop == preset ? Color.accentColor : Ink.divider,
+                                                  lineWidth: coordinator.appearance.backdrop == preset ? 2 : 1))
+                            Text(preset.title).font(.system(size: 11)).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Use \(preset.title) background")
+                    .accessibilityLabel("\(preset.title) background")
+                    .accessibilityAddTraits(coordinator.appearance.backdrop == preset ? .isSelected : [])
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 260)
+        .accessibilityLabel("Background choices")
+    }
+}
+
+private struct AspectRatioPopover: View {
+    @Bindable var coordinator: CaptureCoordinator
+    let imageSize: CGSize
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Aspect Ratio").font(.headline)
+            HStack(alignment: .top, spacing: 8) {
+                ForEach(ScreenshotAspectRatio.allCases) { ratio in
+                    Button { coordinator.appearance.aspectRatio = ratio } label: {
+                        VStack(spacing: 8) {
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(coordinator.appearance.aspectRatio == ratio ? Color.accentColor : Ink.muted.opacity(0.45))
+                                .frame(width: previewSize(for: ratio).width, height: previewSize(for: ratio).height)
+                                .frame(width: 48, height: 40)
+                                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(coordinator.appearance.aspectRatio == ratio ? Color.accentColor : Ink.divider,
+                                                  lineWidth: coordinator.appearance.aspectRatio == ratio ? 2 : 1))
+                            Text(ratio.title).font(.system(size: 11)).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Use \(ratio.title) aspect ratio")
+                    .accessibilityLabel("\(ratio.title) aspect ratio")
+                    .accessibilityAddTraits(coordinator.appearance.aspectRatio == ratio ? .isSelected : [])
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+        .accessibilityLabel("Aspect ratio choices")
+    }
+
+    private func previewSize(for ratio: ScreenshotAspectRatio) -> CGSize {
+        let sourceRatio = imageSize.height > 0 ? imageSize.width / imageSize.height : 16.0 / 9.0
+        let landscape = sourceRatio >= 1
+        let value: CGFloat
+        switch ratio {
+        case .original: value = sourceRatio
+        case .square: value = 1
+        case .fourByThree: value = landscape ? 4.0 / 3.0 : 3.0 / 4.0
+        case .sixteenByNine: value = landscape ? 16.0 / 9.0 : 9.0 / 16.0
+        }
+        let width = min(38, 28 * value)
+        return CGSize(width: width, height: 28)
+    }
+}
+
+private struct FineTunePopover: View {
+    @Bindable var coordinator: CaptureCoordinator
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 8) {
-                    Button { coordinator.copyScreenshot() } label: { Image(systemName: "doc.on.doc") }
-                    .buttonStyle(KitToolButtonStyle())
-                    .keyboardShortcut("c", modifiers: .command)
-                    .help("Copy screenshot (⌘C)")
-                    .accessibilityLabel("Copy screenshot")
-                    .disabled(coordinator.screenshot == nil)
-
-                    Button { coordinator.saveScreenshot() } label: { Image(systemName: "square.and.arrow.down") }
-                    .buttonStyle(KitToolButtonStyle())
-                    .keyboardShortcut("s", modifiers: .command)
-                    .help("Save screenshot (⌘S)")
-                    .accessibilityLabel("Save screenshot")
-                    .disabled(coordinator.screenshot == nil)
-
-                    Button { coordinator.markup.undo() } label: {
-                        Image(systemName: "arrow.uturn.backward")
-                    }
-                    .buttonStyle(KitToolButtonStyle())
-                    .disabled(!coordinator.markup.canUndo)
-                    .keyboardShortcut("z", modifiers: .command)
-                    .help("Undo (⌘Z)")
-                    .accessibilityLabel("Undo")
-
-                    Button { coordinator.markup.redo() } label: {
-                        Image(systemName: "arrow.uturn.forward")
-                    }
-                    .buttonStyle(KitToolButtonStyle())
-                    .disabled(!coordinator.markup.canRedo)
-                    .keyboardShortcut("z", modifiers: [.command, .shift])
-                    .help("Redo (⇧⌘Z)")
-                    .accessibilityLabel("Redo")
-
-                    DragToSaveControl {
-                        guard let screenshot = coordinator.screenshot else { return nil }
-                        return ScreenshotExport.pngData(from: screenshot, annotations: coordinator.markup.annotations, appearance: coordinator.appearance)
-                    }
-                    .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
-                    .opacity(coordinator.screenshot == nil ? 0.4 : 1)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Fine Tune").font(.headline)
+                appearanceSlider("Padding", value: $coordinator.appearance.padding, range: 0...240, step: 8)
+                appearanceSlider("Screenshot Corners", value: $coordinator.appearance.cornerRadius, range: 0...64, step: 2)
+                appearanceSlider("Picture Corners", value: $coordinator.appearance.backdropCornerRadius, range: 0...64, step: 2)
+                Toggle("Shadow", isOn: $coordinator.appearance.shadowEnabled)
+                if coordinator.appearance.shadowEnabled {
+                    appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
+                    appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
                 }
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionTitle("Markup", symbol: "pencil.tip.crop.circle")
-                    LazyVGrid(columns: toolColumns, spacing: 8) {
-                        ForEach(MarkupTool.allCases) { tool in
-                            Button {
-                                coordinator.markup.activeTool = tool
-                            } label: {
-                                Label(tool.title, systemImage: tool.symbol)
-                                    .font(.system(size: 12, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
-                                    .frame(maxWidth: .infinity, minHeight: 32)
-                                    .background(coordinator.markup.activeTool == tool ? Ink.selection : .clear,
-                                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(coordinator.markup.activeTool == tool ? Ink.accentText : Ink.text)
-                            .help("Choose \(tool.title) (\(tool.shortcut))")
-                            .accessibilityLabel(tool.title)
-                            .keyboardShortcut(KeyEquivalent(tool.shortcut.lowercased().first!), modifiers: [])
-                            .disabled(textFieldFocused)
-                        }
-                    }
-                    HStack {
-                        Text("Color").kitType(.label)
-                        ColorMenu(coordinator: coordinator)
-                        Spacer()
-                        if coordinator.markup.selectedMark != nil {
-                            Button { coordinator.markup.removeSelected() } label: { Image(systemName: "trash") }
-                                .buttonStyle(KitToolButtonStyle())
-                                .help("Remove selected mark (Delete)")
-                                .accessibilityLabel("Remove selected mark")
-                        }
-                    }
-                    if let mark = coordinator.markup.selectedMark, mark.tool == .text {
-                        TextField("Text", text: Binding(
-                            get: { coordinator.markup.selectedMark?.text ?? "" },
-                            set: { coordinator.markup.updateSelectedText($0) }
-                        ), onEditingChanged: { editing in
-                            if editing { coordinator.markup.selectedTextChanged() }
-                        })
-                        .textFieldStyle(.roundedBorder)
-                        .focused($textFieldFocused)
-                        .accessibilityLabel("Edit selected text mark")
-                    }
-                }
-
-                Rectangle().fill(Ink.divider).frame(height: 1)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    sectionTitle("Backdrop", symbol: "rectangle.inset.filled")
-                    LazyVGrid(columns: backdropColumns, spacing: 8) {
-                        ForEach(BackdropPreset.allCases) { preset in
-                            Button { coordinator.appearance.backdrop = preset } label: {
-                                VStack(spacing: 4) {
-                                    BackdropPreview(preset: preset)
-                                        .frame(height: 34)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(
-                                            coordinator.appearance.backdrop == preset ? Color.accentColor : Ink.divider,
-                                            lineWidth: coordinator.appearance.backdrop == preset ? 2 : 1
-                                        ))
-                                    Text(preset.title).font(.system(size: 10)).lineLimit(1)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .help("Use \(preset.title) background")
-                            .accessibilityLabel("\(preset.title) background")
-                        }
-                    }
-                    appearanceSlider("Padding", value: $coordinator.appearance.padding, range: 0...240, step: 8)
-                    appearanceSlider("Corners", value: $coordinator.appearance.cornerRadius, range: 0...64, step: 2)
-                    Toggle("Shadow", isOn: $coordinator.appearance.shadowEnabled)
-                    if coordinator.appearance.shadowEnabled {
-                        appearanceSlider("Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
-                        appearanceSlider("Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
-                    }
-                    Picker("Device Frame", selection: $coordinator.appearance.frame) {
-                        ForEach(DeviceFrame.allCases) { frame in Text(frame.title).tag(frame) }
-                    }
-                    .pickerStyle(.segmented)
-                    Button("Reset Backdrop") { coordinator.appearance = .defaults }
-                        .buttonStyle(.borderless)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
+                Button("Reset Appearance") { coordinator.appearance = .defaults }
+                    .buttonStyle(.borderless)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(16)
         }
-        .accessibilityLabel("Screenshot tools and appearance")
-    }
-
-    private func sectionTitle(_ title: String, symbol: String) -> some View {
-        Label(title, systemImage: symbol)
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(Ink.text)
+        .frame(width: 300)
+        .frame(maxHeight: 600)
+        .accessibilityLabel("Fine tune screenshot appearance")
     }
 
     private func appearanceSlider(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double,
-                                 suffix: String = " px", multiplier: Double = 1) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+                                  suffix: String = " px", multiplier: Double = 1) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(title).kitType(.label)
                 Spacer()
@@ -254,7 +343,7 @@ private struct ColorMenu: View {
         .buttonStyle(KitToolButtonStyle())
         .help("Choose markup color")
         .accessibilityLabel("Markup Color")
-        .popover(isPresented: $isPresented, arrowEdge: .trailing) {
+        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Markup Color").font(.headline)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(26), spacing: 8), count: 4), spacing: 8) {
@@ -283,7 +372,7 @@ private struct ColorMenu: View {
                     }
             }
             .padding(16)
-            .frame(width: 180)
+            .frame(width: 196)
         }
     }
 }

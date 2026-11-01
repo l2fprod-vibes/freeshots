@@ -21,6 +21,9 @@ jobs:
       - name: Check out Freeshots
         uses: actions/checkout@v4
 
+      - name: Run tests
+        run: swift test --scratch-path "$RUNNER_TEMP/freeshots-test-build"
+
       # Verify tap access before spending time building and notarizing.
       - name: Check out Homebrew tap
         if: github.ref_type == 'tag'

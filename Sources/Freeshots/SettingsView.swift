@@ -50,12 +50,15 @@ struct SettingsView: View {
                 Text("Keep the most recent capture on this Mac so it can be reopened from the menu bar.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            Section("Privacy") {
+            Section("Permissions") {
                 Label(
                     screenRecordingAllowed ? "Screen Recording allowed" : "Screen Recording required",
                     systemImage: screenRecordingAllowed ? "checkmark.shield.fill" : "hand.raised.fill"
                 )
                 .foregroundStyle(screenRecordingAllowed ? Ink.accentText : Ink.warning)
+                Button("Check Permissions Again") {
+                    screenRecordingAllowed = CGPreflightScreenCaptureAccess()
+                }
                 if !screenRecordingAllowed {
                     Button("Open Screen Recording Settings") {
                         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {

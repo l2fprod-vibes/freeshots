@@ -2,7 +2,7 @@
 
 ## Feel
 
-Three words: quick, crisp, expressive. Like a focused creative utility. The graphite-and-lime direction is an agent design choice for the requested modern feel; all color values live in tokens for easy revision.
+Three words: quick, crisp, expressive. Like a focused creative utility. Editor chrome uses macOS semantic surfaces and the user's system accent. Screenshot backdrops and markup color remain user-controlled content.
 
 ## Tokens
 
@@ -10,16 +10,15 @@ Three words: quick, crisp, expressive. Like a focused creative utility. The grap
 
 | Meaning | Light | Dark | Use |
 |---|---|---|---|
-| `Ink.canvas` | `#F1F3F5` | `#171A1F` | Editor background |
-| `Ink.surface` | `#FFFFFF` | `#232830` | Floating chrome and tool groups |
-| `Ink.text` | `#20252C` | `#F4F6F8` | Main labels |
-| `Ink.muted` | `#66717C` | `#A1AAB4` | Secondary labels |
-| `Ink.accent` | `#D6FF4F` | `#D6FF4F` | Primary action and selected tool |
-| `Ink.accentText` | `#435800` | `#D6FF4F` | Accent text with contrast |
-| `Ink.onAccent` | `#1A2109` | `#1A2109` | Text on lime |
-| `Ink.selection` | `#EDF7C6` | `#394820` | Selected tool surface |
-| `Ink.divider` | `#DDE2E6` | `#383E47` | Separators |
-| `Ink.warning` | `#A83D32` | `#FF877B` | Errors with icon and label |
+| `Ink.canvas` | `windowBackgroundColor` | `windowBackgroundColor` | Editor canvas surround |
+| `Ink.surface` | `controlBackgroundColor` | `controlBackgroundColor` | Custom control surface |
+| `Ink.text` | `primary` | `primary` | Main labels |
+| `Ink.muted` | `secondary` | `secondary` | Supporting labels |
+| `Ink.accent` | `accentColor` | `accentColor` | Focus and selected state |
+| `Ink.selection` | `selectedContentBackgroundColor` | `selectedContentBackgroundColor` | Selected tool surface |
+| `Ink.selectionText` | `selectedMenuItemTextColor` | `selectedMenuItemTextColor` | Selected tool symbol |
+| `Ink.divider` | `separatorColor` | `separatorColor` | Separators |
+| `Ink.warning` | `systemRed` | `systemRed` | Errors with icon and label |
 
 ### Scales
 
@@ -42,7 +41,7 @@ Use the system font by role through `KitType`. Use `KitIcon` names in custom con
 
 ## Window
 
-The editor is a resizable floating utility window with hidden title text, visible traffic lights, and a custom top strip. Screenshot content remains clear of custom chrome. The status item and macOS menus remain system controls.
+The editor is a resizable floating utility window with hidden title text and visible traffic lights. The screenshot canvas sits beside a 272 pt inspector. The status item and macOS menus remain system controls.
 
 ## Parts
 
@@ -52,11 +51,11 @@ Header: 42 pt high; title on the left, standard traffic lights, drag area. Light
 
 ### Markup tool button
 
-30 × 30 pt, 10 pt radius, icon centered. Rest is transparent; hover uses a subtle `Ink.selection`; pressed scales to 0.97; selected uses opaque `Ink.selection` plus `Ink.accent` icon; focused gets a 2 pt accent outline; disabled is 40% opacity. Same structure in light and dark.
+30 × 30 pt, 10 pt radius, icon centered. Rest is transparent; hover uses a subtle `Ink.selection`; pressed scales to 0.97; selected uses `Ink.selection`; focused gets a 2 pt accent outline; disabled is 40% opacity. Same structure in light and dark.
 
 ### Action button
 
-32 pt high, 10 pt radius. Primary is lime with `Ink.onAccent`; secondary is `Ink.surface` with `Ink.text`; ghost is transparent until hover. Include rest, hover, pressed, focused, and disabled states in both appearances.
+32 pt high, 10 pt radius. Use native system button styles for primary actions; secondary is `Ink.surface` with `Ink.text`; ghost is transparent until hover. Include rest, hover, pressed, focused, and disabled states in both appearances.
 
 ### Drag to Save handle
 

@@ -2,33 +2,9 @@ import AppKit
 import Observation
 import SwiftUI
 import FreeshotsCore
+import FreeshotsRendering
 
-enum MarkupTool: String, CaseIterable, Identifiable {
-    case select, arrow, shape, text, pen, redact
-
-    var id: Self { self }
-    var title: String { rawValue.capitalized }
-    var symbol: String {
-        switch self {
-        case .select: "cursorarrow"
-        case .arrow: "arrow.up.right"
-        case .shape: "rectangle"
-        case .text: "textformat"
-        case .pen: "pencil.tip"
-        case .redact: "rectangle.fill"
-        }
-    }
-    var shortcut: String {
-        switch self {
-        case .select: "V"
-        case .arrow: "A"
-        case .shape: "R"
-        case .text: "T"
-        case .pen: "P"
-        case .redact: "G"
-        }
-    }
-
+extension MarkupTool {
     var icon: KitIcon {
         switch self {
         case .select: .select
@@ -37,36 +13,8 @@ enum MarkupTool: String, CaseIterable, Identifiable {
         case .text: .text
         case .pen: .pen
         case .redact: .redact
+        case .blur: .redact
         }
-    }
-}
-
-struct ScreenshotMark: Identifiable, Equatable {
-    var id = UUID()
-    var tool: MarkupTool
-    var start: CGPoint
-    var end: CGPoint
-    var points: [CGPoint] = []
-    var text = ""
-    var colorHex = "E53935"
-
-    var normalizedBounds: CGRect {
-        if tool == .pen, !points.isEmpty {
-            let xs = points.map(\.x), ys = points.map(\.y)
-            return CGRect(x: xs.min() ?? 0, y: ys.min() ?? 0,
-                          width: (xs.max() ?? 0) - (xs.min() ?? 0),
-                          height: (ys.max() ?? 0) - (ys.min() ?? 0))
-        }
-        return CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
-                      width: abs(end.x - start.x), height: abs(end.y - start.y))
-    }
-
-    func offsetBy(_ delta: CGPoint) -> ScreenshotMark {
-        var copy = self
-        copy.start.x += delta.x; copy.start.y += delta.y
-        copy.end.x += delta.x; copy.end.y += delta.y
-        copy.points = points.map { CGPoint(x: $0.x + delta.x, y: $0.y + delta.y) }
-        return copy
     }
 }
 
@@ -146,34 +94,16 @@ struct MarkupCanvas: View {
     @State private var moveOrigin: CGPoint = .zero
     @State private var originalMark: ScreenshotMark?
 
+    init(image: NSImage, appearance: ScreenshotAppearance) {
+        self.image = image
+        self.appearance = appearance
+    }
+
     var body: some View {
         GeometryReader { geometry in
-            let layout = fittedRects(image.size, in: geometry.size)
-            let imageRect = layout.image
-            ZStack(alignment: .topLeading) {
-                BackdropPreview(preset: appearance.backdrop)
-                    .frame(width: layout.backdrop.width, height: layout.backdrop.height)
-                    .clipShape(RoundedRectangle(cornerRadius: appearance.cornerRadius * layout.scale, style: .continuous))
-                    .position(x: layout.backdrop.midX, y: layout.backdrop.midY)
-                if appearance.frame != .none {
-                    RoundedRectangle(cornerRadius: appearance.frame == .phone ? 48 * layout.scale : 18 * layout.scale)
-                        .fill(Color(white: 0.08))
-                        .frame(width: layout.frame.width, height: layout.frame.height)
-                        .position(x: layout.frame.midX, y: layout.frame.midY)
-                }
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: imageRect.width, height: imageRect.height)
-                    .clipShape(RoundedRectangle(cornerRadius: appearance.cornerRadius * layout.scale, style: .continuous))
-                    .shadow(color: .black.opacity(appearance.shadowEnabled ? appearance.shadowOpacity : 0),
-                            radius: appearance.shadowBlur * layout.scale, y: appearance.shadowBlur * layout.scale * 0.35)
-                    .position(x: imageRect.midX, y: imageRect.midY)
-                ForEach(markup.annotations) { mark in
-                    markView(mark, in: imageRect, selected: mark.id == markup.selectedID)
-                }
-                if let draft { markView(draft, in: imageRect, selected: false) }
-            }
+            let imageRect = ScreenshotArtworkView.imageRect(imageSize: image.size, in: geometry.size, appearance: appearance)
+            ScreenshotArtworkView(image: image, appearance: appearance, annotations: markup.annotations,
+                                  selectedID: markup.selectedID, draft: draft, selectionColor: Ink.accentText)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: markup.activeTool == .select || markup.activeTool == .text ? 0 : 2)
@@ -191,28 +121,6 @@ struct MarkupCanvas: View {
             originalMark = nil
             markup.selectedID = nil
         }
-    }
-
-    private func fittedRects(_ imageSize: CGSize, in size: CGSize) -> (image: CGRect, backdrop: CGRect, frame: CGRect, scale: CGFloat) {
-        guard imageSize.width > 0, imageSize.height > 0 else { return (.zero, .zero, .zero, 1) }
-        let pad = CGFloat(max(0, appearance.padding))
-        let shadowInset: CGFloat = appearance.shadowEnabled ? CGFloat(max(0, appearance.shadowBlur)) * 2 : 0
-        let frameSide: CGFloat = appearance.frame == .none ? 0 : appearance.frame == .phone ? 22 : 14
-        let frameTop: CGFloat = appearance.frame == .none ? 0 : appearance.frame == .phone ? 42 : 28
-        let scale = min(size.width / (imageSize.width + 2 * (pad + frameSide + shadowInset)),
-                        size.height / (imageSize.height + 2 * (pad + frameSide + shadowInset) + frameTop))
-        let inset = (pad + frameSide) * scale
-        let image = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-        let backdropSize = CGSize(width: image.width + inset * 2, height: image.height + inset * 2 + frameTop * scale)
-        let totalSize = CGSize(width: backdropSize.width + 2 * shadowInset * scale,
-                               height: backdropSize.height + 2 * shadowInset * scale)
-        let backdrop = CGRect(x: (size.width - totalSize.width) / 2 + shadowInset * scale,
-                              y: (size.height - totalSize.height) / 2 + shadowInset * scale,
-                              width: backdropSize.width, height: backdropSize.height)
-        let imageRect = CGRect(x: backdrop.minX + inset, y: backdrop.minY + inset,
-                               width: image.width, height: image.height)
-        let frame = imageRect.insetBy(dx: -frameSide * scale, dy: -frameSide * scale).insetBy(dx: 0, dy: -frameTop * scale / 2)
-        return (imageRect, backdrop, frame, scale)
     }
 
     private func normalized(_ point: CGPoint, in rect: CGRect) -> CGPoint {
@@ -271,74 +179,6 @@ struct MarkupCanvas: View {
         return nil
     }
 
-    @ViewBuilder
-    private func markView(_ mark: ScreenshotMark, in rect: CGRect, selected: Bool) -> some View {
-        let start = canvasPoint(mark.start, in: rect)
-        let end = canvasPoint(mark.end, in: rect)
-        let bounds = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
-                            width: abs(end.x - start.x), height: abs(end.y - start.y))
-        ZStack(alignment: .topLeading) {
-            switch mark.tool {
-            case .arrow:
-                ArrowMark(start: start, end: end, lineWidth: max(5, rect.width * 0.012), colorHex: mark.colorHex)
-            case .shape:
-                Rectangle().stroke(markColor(mark.colorHex), lineWidth: 3).frame(width: bounds.width, height: bounds.height)
-                    .position(x: bounds.midX, y: bounds.midY)
-            case .redact:
-                Rectangle().fill(Color.black).frame(width: max(12, bounds.width), height: max(12, bounds.height))
-                    .position(x: bounds.midX, y: bounds.midY)
-            case .pen:
-                Path { path in
-                    let points = mark.points.map { canvasPoint($0, in: rect) }
-                    guard let first = points.first else { return }
-                    path.move(to: first)
-                    points.dropFirst().forEach { path.addLine(to: $0) }
-                }
-                .stroke(markColor(mark.colorHex), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-            case .text:
-                Text(mark.text)
-                    .font(.system(size: max(16, rect.width * 0.035), weight: .semibold))
-                    .foregroundStyle(markColor(mark.colorHex))
-                    .position(start)
-            case .select:
-                EmptyView()
-            }
-            if selected {
-                Rectangle().stroke(Ink.accentText, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    .frame(width: max(10, bounds.width), height: max(10, bounds.height))
-                    .position(x: bounds.midX, y: bounds.midY)
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(width: rect.width, height: rect.height, alignment: .topLeading)
-        .position(x: rect.midX, y: rect.midY)
-    }
-
-    private func canvasPoint(_ point: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(x: point.x * rect.width, y: point.y * rect.height)
-    }
-
-    private func markColor(_ hex: String) -> Color { Color(nsColor: NSColor(hex: hex) ?? .systemRed) }
-}
-
-struct ArrowMark: View {
-    let start: CGPoint
-    let end: CGPoint
-    let lineWidth: CGFloat
-    let colorHex: String
-    var body: some View {
-        let angle = atan2(end.y - start.y, end.x - start.x)
-        let headLength = max(18, lineWidth * 4)
-        let halfWidth = lineWidth * 1.5
-        let base = CGPoint(x: end.x - headLength * cos(angle), y: end.y - headLength * sin(angle))
-        let left = CGPoint(x: base.x + halfWidth * sin(angle), y: base.y - halfWidth * cos(angle))
-        let right = CGPoint(x: base.x - halfWidth * sin(angle), y: base.y + halfWidth * cos(angle))
-        Path { path in
-            path.move(to: start); path.addLine(to: base)
-            path.move(to: left); path.addLine(to: end); path.addLine(to: right)
-        }.stroke(Color(nsColor: NSColor(hex: colorHex) ?? .systemRed),
-                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-    }
 }
 
 extension NSColor {
@@ -367,20 +207,24 @@ struct BackdropPreview: View {
             }
             if preset.texture {
                 Canvas { context, size in
-                    let step: CGFloat = preset == .blueprint ? 32 : 7
-                    if preset == .blueprint {
+                    let step: CGFloat = preset == .blueprint ? 32 : preset == .graphiteGrid ? 24 : preset == .roseDots ? 12 : preset == .sand ? 9 : 7
+                    if preset.usesGridTexture {
+                        let opacity = preset == .blueprint ? 0.16 : 0.10
                         for x in stride(from: 0, through: size.width, by: step) {
                             var path = Path(); path.move(to: CGPoint(x: x, y: 0)); path.addLine(to: CGPoint(x: x, y: size.height))
-                            context.stroke(path, with: .color(.white.opacity(0.16)), lineWidth: 1)
+                            context.stroke(path, with: .color(.white.opacity(opacity)), lineWidth: 1)
                         }
                         for y in stride(from: 0, through: size.height, by: step) {
                             var path = Path(); path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: size.width, y: y))
-                            context.stroke(path, with: .color(.white.opacity(0.16)), lineWidth: 1)
+                            context.stroke(path, with: .color(.white.opacity(opacity)), lineWidth: 1)
                         }
                     } else {
-                        for x in stride(from: 0, through: size.width, by: step) {
-                            for y in stride(from: 0, through: size.height, by: step) {
-                                context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)), with: .color(.white.opacity(0.10)))
+                        let dotColor: Color = preset == .sand ? .black.opacity(0.12) : .white.opacity(0.12)
+                        for y in stride(from: 0, through: size.height, by: step) {
+                            let offset = preset.usesDiagonalDotTexture ? (Int(y / step).isMultiple(of: 2) ? 0 : step / 2) : 0
+                            for x in stride(from: offset, through: size.width, by: step) {
+                                let diameter: CGFloat = preset.usesDiagonalDotTexture ? 2 : 1
+                                context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: diameter, height: diameter)), with: .color(dotColor))
                             }
                         }
                     }

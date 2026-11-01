@@ -6,11 +6,12 @@ let package = Package(
     platforms: [.macOS(.v26)],
     targets: [
         .target(name: "FreeshotsCore"),
+        .target(name: "FreeshotsRendering", dependencies: ["FreeshotsCore"], swiftSettings: [.defaultIsolation(MainActor.self)]),
         .executableTarget(
             name: "Freeshots",
-            dependencies: ["FreeshotsCore"],
+            dependencies: ["FreeshotsCore", "FreeshotsRendering"],
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
-        .testTarget(name: "FreeshotsCoreTests", dependencies: ["FreeshotsCore"]),
+        .testTarget(name: "FreeshotsCoreTests", dependencies: ["FreeshotsCore", "FreeshotsRendering"]),
     ]
 )
