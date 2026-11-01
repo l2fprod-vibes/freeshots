@@ -49,5 +49,5 @@ if [[ -f "$here/Resources/AppIcon.icns" ]]; then
   cp "$here/Resources/AppIcon.icns" "$app/Contents/Resources/"
 fi
 
-codesign --force --sign "$identity" "$app"
+codesign --force --sign "$identity" --options runtime --timestamp "$app"
 echo "built $app"

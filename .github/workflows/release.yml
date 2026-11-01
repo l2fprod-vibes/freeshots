@@ -106,8 +106,20 @@ jobs:
           xcrun notarytool store-credentials freeshots-notary \
             --apple-id "$APPLE_ID" --password "$APP_PASSWORD" --team-id "$TEAM_ID" \
             --keychain "$KEYCHAIN_PATH"
-          xcrun notarytool submit "$RUNNER_TEMP/Freeshots-notarize.zip" \
-            --wait --keychain-profile freeshots-notary
+          if ! SUBMISSION_JSON=$(xcrun notarytool submit "$RUNNER_TEMP/Freeshots-notarize.zip" \
+            --wait --output-format json --keychain-profile freeshots-notary); then
+            echo "Apple notarization submission failed before processing." >&2
+            exit 1
+          fi
+          printf '%s\n' "$SUBMISSION_JSON"
+          SUBMISSION_ID="$(printf '%s\n' "$SUBMISSION_JSON" | jq -r '.id')"
+          SUBMISSION_STATUS="$(printf '%s\n' "$SUBMISSION_JSON" | jq -r '.status')"
+          if [[ "$SUBMISSION_STATUS" != "Accepted" ]]; then
+            echo "Apple notarization returned $SUBMISSION_STATUS. Detailed log:" >&2
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --output-format json --keychain-profile freeshots-notary || true
+            exit 1
+          fi
           xcrun stapler staple build/Freeshots.app
           xcrun stapler validate build/Freeshots.app
           ditto -c -k --keepParent build/Freeshots.app "dist/${ZIP_NAME}"
