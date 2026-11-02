@@ -131,10 +131,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          CHANNEL="$GITHUB_REF_NAME"
-          if [[ "$CHANNEL" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            CHANNEL="branch/${CHANNEL}"
-          fi
+          CHANNEL="build/${GITHUB_REF_NAME}"
           ASSET_CHANNEL="${CHANNEL//\//-}"
           ZIP_NAME="Freeshots-${ASSET_CHANNEL}.zip"
           NOTES_FILE="$RUNNER_TEMP/freeshots-${ASSET_CHANNEL}-notes.md"

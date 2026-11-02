@@ -100,15 +100,16 @@ func rendererAppliesRedaction() throws {
     let appearance = ScreenshotAppearance(backdrop: .transparent, padding: 5, cornerRadius: 0,
                                           shadowEnabled: false, frame: .none)
     let redaction = ScreenshotMark(tool: .redact, start: CGPoint(x: 0.25, y: 0.25),
-                                   end: CGPoint(x: 0.75, y: 0.75))
+                                   end: CGPoint(x: 0.75, y: 0.75), colorHex: "00FF00")
 
     let data = try #require(ScreenshotRenderer.pngData(image: source, annotations: [redaction], appearance: appearance))
     let bitmap = try #require(NSBitmapImageRep(data: data))
     let pixel = try #require(bitmap.colorAt(x: 20, y: 15)?.usingColorSpace(.deviceRGB))
 
     #expect(pixel.redComponent < 0.05)
-    #expect(pixel.greenComponent < 0.05)
+    #expect(pixel.greenComponent > 0.9)
     #expect(pixel.blueComponent < 0.05)
+    #expect(pixel.alphaComponent > 0.95)
 }
 
 @MainActor
