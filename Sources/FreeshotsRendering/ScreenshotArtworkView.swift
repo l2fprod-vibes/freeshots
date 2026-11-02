@@ -1,4 +1,6 @@
 import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 import FreeshotsCore
 
@@ -111,23 +113,26 @@ public struct ScreenshotArtworkView: View {
         ZStack(alignment: .topLeading) {
             switch mark.tool {
             case .arrow:
-                ArrowMark(start: start, end: end, lineWidth: max(5, rect.width * 0.012), colorHex: mark.colorHex)
+                ArrowMark(start: start, end: end, lineWidth: max(5, rect.width * 0.012), colorHex: mark.colorHex, style: mark.arrowStyle)
             case .shape:
                 Rectangle().stroke(markColor(mark.colorHex), lineWidth: 3).frame(width: bounds.width, height: bounds.height)
                     .position(x: bounds.midX, y: bounds.midY)
             case .redact:
-                Rectangle().fill(Color.black).frame(width: max(12, bounds.width), height: max(12, bounds.height))
+                Rectangle().fill(markColor(mark.colorHex)).frame(width: max(12, bounds.width), height: max(12, bounds.height))
                     .position(x: bounds.midX, y: bounds.midY)
             case .blur:
-                Image(nsImage: image)
-                    .resizable().interpolation(.high)
-                    .frame(width: rect.width, height: rect.height)
-                    .position(x: rect.midX, y: rect.midY)
-                    .blur(radius: 12)
-                    .mask(alignment: .topLeading) {
-                        Rectangle().frame(width: max(1, bounds.width), height: max(1, bounds.height))
-                            .offset(x: bounds.minX, y: bounds.minY)
-                    }
+                if let pixelatedImage = Self.pixelated(image) {
+                    Image(nsImage: pixelatedImage)
+                        .resizable().interpolation(.none)
+                        .frame(width: rect.width, height: rect.height)
+                        .mask {
+                            Rectangle()
+                                .frame(width: max(1, bounds.width), height: max(1, bounds.height))
+                                .position(x: bounds.midX, y: bounds.midY)
+                        }
+                        .frame(width: rect.width, height: rect.height, alignment: .topLeading)
+                        .position(x: rect.midX, y: rect.midY)
+                }
             case .pen:
                 Path { path in
                     let points = mark.points.map { canvasPoint($0, in: rect) }
@@ -160,6 +165,18 @@ public struct ScreenshotArtworkView: View {
     }
 
     private func markColor(_ hex: String) -> Color { Color(nsColor: NSColor(hex: hex) ?? .systemRed) }
+
+    private static func pixelated(_ image: NSImage) -> NSImage? {
+        var imageRect = CGRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(forProposedRect: &imageRect, context: nil, hints: nil) else { return nil }
+        let source = CIImage(cgImage: cgImage)
+        let filter = CIFilter.pixellate()
+        filter.inputImage = source
+        filter.scale = 14
+        guard let output = filter.outputImage?.cropped(to: source.extent),
+              let result = CIContext().createCGImage(output, from: source.extent) else { return nil }
+        return NSImage(cgImage: result, size: image.size)
+    }
 }
 
 private struct DeviceFramePreview: View {
@@ -210,6 +227,7 @@ private struct ArrowMark: View {
     let end: CGPoint
     let lineWidth: CGFloat
     let colorHex: String
+    let style: ArrowStyle
 
     var body: some View {
         let angle = atan2(end.y - start.y, end.x - start.x)
@@ -218,11 +236,35 @@ private struct ArrowMark: View {
         let base = CGPoint(x: end.x - headLength * cos(angle), y: end.y - headLength * sin(angle))
         let left = CGPoint(x: base.x + halfWidth * sin(angle), y: base.y - halfWidth * cos(angle))
         let right = CGPoint(x: base.x - halfWidth * sin(angle), y: base.y + halfWidth * cos(angle))
-        Path { path in
-            path.move(to: start); path.addLine(to: base)
-            path.move(to: left); path.addLine(to: end); path.addLine(to: right)
-        }.stroke(Color(nsColor: NSColor(hex: colorHex) ?? .systemRed),
-                 style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+        let color = Color(nsColor: NSColor(hex: colorHex) ?? .systemRed)
+        let shaftEnd = base
+        ZStack {
+            Path { path in
+                path.move(to: start); path.addLine(to: shaftEnd)
+                if style == .double {
+                    let reverseBase = CGPoint(x: start.x + headLength * cos(angle), y: start.y + headLength * sin(angle))
+                    let reverseLeft = CGPoint(x: reverseBase.x - halfWidth * sin(angle), y: reverseBase.y + halfWidth * cos(angle))
+                    let reverseRight = CGPoint(x: reverseBase.x + halfWidth * sin(angle), y: reverseBase.y - halfWidth * cos(angle))
+                    path.move(to: reverseLeft); path.addLine(to: start); path.addLine(to: reverseRight)
+                }
+                if style == .open || style == .dashed {
+                    path.move(to: left); path.addLine(to: end); path.addLine(to: right)
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round,
+                                             dash: style == .dashed ? [lineWidth * 2, lineWidth * 1.5] : []))
+            if style == .solid || style == .double {
+                Path { path in
+                    path.move(to: end); path.addLine(to: left); path.addLine(to: right); path.closeSubpath()
+                    if style == .double {
+                        let reverseBase = CGPoint(x: start.x + headLength * cos(angle), y: start.y + headLength * sin(angle))
+                        let reverseLeft = CGPoint(x: reverseBase.x - halfWidth * sin(angle), y: reverseBase.y + halfWidth * cos(angle))
+                        let reverseRight = CGPoint(x: reverseBase.x + halfWidth * sin(angle), y: reverseBase.y - halfWidth * cos(angle))
+                        path.move(to: start); path.addLine(to: reverseLeft); path.addLine(to: reverseRight); path.closeSubpath()
+                    }
+                }.fill(color)
+            }
+        }
     }
 }
 

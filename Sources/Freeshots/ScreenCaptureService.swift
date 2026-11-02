@@ -5,7 +5,7 @@ final class ScreenCaptureService {
     static let shared = ScreenCaptureService()
     private init() {}
 
-    func capture(_ mode: CaptureMode) async throws -> NSImage? {
+    func capture(_ mode: CaptureMode, includeWindowShadow: Bool) async throws -> NSImage? {
         guard CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() else {
             throw Failure.permissionDenied
         }
@@ -20,7 +20,10 @@ final class ScreenCaptureService {
         case .area:
             process.arguments = ["-i", "-s", "-x", url.path]
         case .window:
-            process.arguments = ["-i", "-w", "-x", url.path]
+            var arguments = ["-i", "-w", "-x"]
+            if !includeWindowShadow { arguments.append("-o") }
+            arguments.append(url.path)
+            process.arguments = arguments
         case .display:
             let pointer = NSEvent.mouseLocation
             let displayIndex = NSScreen.screens.firstIndex { $0.frame.contains(pointer) } ?? 0

@@ -17,6 +17,7 @@ struct FreeshotsApp: App {
                 .environment(coordinator)
                 .environment(hotkeys)
                 .themed()
+                .appAppearance()
         }
         .menuBarExtraStyle(.menu)
 
@@ -85,7 +86,7 @@ final class CaptureCoordinator {
         let content: AnyView = KitGallery.enabled
             ? AnyView(KitGallery())
             : AnyView(ContentView())
-        panel.contentView = NSHostingView(rootView: content.environment(self).environment(markup).themed())
+        panel.contentView = NSHostingView(rootView: content.environment(self).environment(markup).themed().appAppearance())
         panel.delegate = panel
         panel.shouldCloseHandler = { [weak self] in self?.confirmClose() ?? true }
         panel.didCloseHandler = { [weak self] in self?.editorDidClose(panel) }
@@ -173,7 +174,8 @@ final class CaptureCoordinator {
         statusMessage = nil
         Task {
             do {
-                guard let image = try await ScreenCaptureService.shared.capture(mode) else {
+                let includeWindowShadow = UserDefaults.standard.bool(forKey: "includeWindowShadow")
+                guard let image = try await ScreenCaptureService.shared.capture(mode, includeWindowShadow: includeWindowShadow) else {
                     requestedMode = previousMode
                     if wasEditorVisible { showFloatingEditor() }
                     return
@@ -433,7 +435,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.permissionWindow?.close()
             self?.permissionWindow = nil
             NSApp.setActivationPolicy(.accessory)
-        }))
+        }).appAppearance())
         hostingView.sizingOptions = []
         window.contentView = hostingView
         window.setContentSize(NSSize(width: 500, height: 280))

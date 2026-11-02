@@ -24,6 +24,7 @@ final class MarkupDocument {
     var annotations: [ScreenshotMark] = []
     var activeTool: MarkupTool = .select
     var activeColorHex = "E53935"
+    var activeArrowStyle: ArrowStyle = .solid
     var selectedID: UUID?
     @ObservationIgnored private var undoStack: [[ScreenshotMark]] = []
     @ObservationIgnored private var redoStack: [[ScreenshotMark]] = []
@@ -147,7 +148,8 @@ struct MarkupCanvas: View {
 
         if draft == nil {
             draft = ScreenshotMark(tool: markup.activeTool, start: point, end: point,
-                                   points: markup.activeTool == .pen ? [point] : [], colorHex: markup.activeColorHex)
+                                   points: markup.activeTool == .pen ? [point] : [], colorHex: markup.activeColorHex,
+                                   arrowStyle: markup.activeArrowStyle)
         } else {
             draft?.end = point
             if markup.activeTool == .pen { draft?.points.append(point) }

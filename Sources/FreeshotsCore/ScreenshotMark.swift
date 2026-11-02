@@ -29,6 +29,20 @@ public enum MarkupTool: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+public enum ArrowStyle: String, CaseIterable, Identifiable, Sendable {
+    case solid, open, dashed, double
+
+    public var id: Self { self }
+    public var title: String {
+        switch self {
+        case .solid: "Solid"
+        case .open: "Open"
+        case .dashed: "Dashed"
+        case .double: "Double"
+        }
+    }
+}
+
 public struct ScreenshotMark: Identifiable, Equatable, Sendable {
     public var id: UUID
     public var tool: MarkupTool
@@ -37,9 +51,11 @@ public struct ScreenshotMark: Identifiable, Equatable, Sendable {
     public var points: [CGPoint]
     public var text: String
     public var colorHex: String
+    public var arrowStyle: ArrowStyle
 
     public init(id: UUID = UUID(), tool: MarkupTool, start: CGPoint, end: CGPoint,
-                points: [CGPoint] = [], text: String = "", colorHex: String = "E53935") {
+                points: [CGPoint] = [], text: String = "", colorHex: String = "E53935",
+                arrowStyle: ArrowStyle = .solid) {
         self.id = id
         self.tool = tool
         self.start = start
@@ -47,6 +63,7 @@ public struct ScreenshotMark: Identifiable, Equatable, Sendable {
         self.points = points
         self.text = text
         self.colorHex = colorHex
+        self.arrowStyle = arrowStyle
     }
 
     public var normalizedBounds: CGRect {
@@ -77,6 +94,6 @@ extension ScreenshotMark {
         lhs.start.x == rhs.start.x && lhs.start.y == rhs.start.y &&
         lhs.end.x == rhs.end.x && lhs.end.y == rhs.end.y &&
         lhs.points.elementsEqual(rhs.points, by: { $0.x == $1.x && $0.y == $1.y }) &&
-        lhs.text == rhs.text && lhs.colorHex == rhs.colorHex
+        lhs.text == rhs.text && lhs.colorHex == rhs.colorHex && lhs.arrowStyle == rhs.arrowStyle
     }
 }

@@ -66,16 +66,43 @@ private struct EditorToolbar: View {
     var body: some View {
         HStack(spacing: 8) {
             ForEach(MarkupTool.allCases) { tool in
-                Button { coordinator.markup.activeTool = tool } label: {
-                    Image(systemName: tool.symbol)
-                        .font(.system(size: 15, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
+                if tool == .arrow {
+                    Menu {
+                        ForEach(ArrowStyle.allCases) { style in
+                            Button {
+                                coordinator.markup.activeArrowStyle = style
+                                coordinator.markup.activeTool = .arrow
+                            } label: {
+                                if coordinator.markup.activeArrowStyle == style {
+                                    Label(style.title, systemImage: "checkmark")
+                                } else {
+                                    Text(style.title)
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: tool.symbol)
+                            .font(.system(size: 15, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
+                    }
+                    .menuStyle(.borderlessButton)
+                    .buttonStyle(KitToolButtonStyle(selected: coordinator.markup.activeTool == tool))
+                    .help("Choose Arrow Style (A)")
+                    .accessibilityLabel("Arrow")
+                    .accessibilityValue(coordinator.markup.activeArrowStyle.title)
+                    .accessibilityAddTraits(coordinator.markup.activeTool == tool ? .isSelected : [])
+                    .disabled(textFieldFocused)
+                } else {
+                    Button { coordinator.markup.activeTool = tool } label: {
+                        Image(systemName: tool.symbol)
+                            .font(.system(size: 15, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
+                    }
+                    .buttonStyle(KitToolButtonStyle(selected: coordinator.markup.activeTool == tool))
+                    .help("Choose \(tool.title) (\(tool.shortcut))")
+                    .accessibilityLabel(tool.title)
+                    .accessibilityAddTraits(coordinator.markup.activeTool == tool ? .isSelected : [])
+                    .keyboardShortcut(KeyEquivalent(tool.shortcut.lowercased().first!), modifiers: [])
+                    .disabled(textFieldFocused)
                 }
-                .buttonStyle(KitToolButtonStyle(selected: coordinator.markup.activeTool == tool))
-                .help("Choose \(tool.title) (\(tool.shortcut))")
-                .accessibilityLabel(tool.title)
-                .accessibilityAddTraits(coordinator.markup.activeTool == tool ? .isSelected : [])
-                .keyboardShortcut(KeyEquivalent(tool.shortcut.lowercased().first!), modifiers: [])
-                .disabled(textFieldFocused)
             }
 
             ColorMenu(coordinator: coordinator)
@@ -138,6 +165,19 @@ private struct EditorToolbar: View {
                 .popover(isPresented: $fineTunePresented, arrowEdge: .bottom) {
                     FineTunePopover(coordinator: coordinator)
                 }
+            toolButton("arrow.counterclockwise", title: "Reset Appearance", help: "Reset screenshot appearance") {
+                coordinator.appearance = ScreenshotAppearance(
+                    backdrop: .transparent,
+                    padding: 0,
+                    cornerRadius: 0,
+                    backdropCornerRadius: 0,
+                    shadowEnabled: false,
+                    shadowBlur: 0,
+                    shadowOpacity: 0,
+                    frame: .none,
+                    aspectRatio: .original
+                )
+            }
 
             Spacer(minLength: 8)
 
@@ -296,9 +336,6 @@ private struct FineTunePopover: View {
                     appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
                     appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
                 }
-                Button("Reset Appearance") { coordinator.appearance = .defaults }
-                    .buttonStyle(.borderless)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(16)
         }

@@ -40,11 +40,11 @@ Acceptance:
 - [manual] I can restore the original shortcuts.
 
 UX:
-- Flow: menu bar item -> Settings -> Keyboard Shortcuts -> record a shortcut -> close Settings; press the shortcut anywhere -> capture flow.
-- Surface: Settings window, a self-contained place to configure shortcuts.
-- States: each shortcut shows its current keys; conflicts appear inline with a clear fix; Restore Defaults returns the shipped shortcut set.
+- Flow: menu bar item or Command-comma -> Settings -> choose General, Keyboard Shortcuts, or Permissions -> adjust a value or record a shortcut -> close Settings; press a configured shortcut anywhere -> capture flow.
+- Surface: native Settings window with topic tabs, the lightest standard navigation for a small set of related preference groups.
+- States: the selected tab is remembered; each shortcut shows its current keys; conflicts appear inline with a clear fix; Restore Defaults returns the shipped shortcut set; Permissions shows the current Screen Recording state.
 - Words: "Keyboard Shortcuts", "Restore Defaults", "Shortcut already in use".
-- Access: shortcut fields work by keyboard and VoiceOver; Escape cancels shortcut recording.
+- Access: tabs and shortcut fields work by keyboard and VoiceOver; Escape cancels shortcut recording.
 
 Status: done
 
@@ -59,17 +59,18 @@ Depends: S-001
 Acceptance:
 - [manual] Display capture records the selected display at its native pixel dimensions.
 - [manual] Window capture lets me point to a visible window and select it.
+- [manual] Settings includes Include Window Shadow, off by default; when enabled, window captures include the macOS shadow, and when disabled they omit it.
 - [manual] Area capture lets me drag a rectangle and adjust its edges before confirming.
 - [manual] Escape cancels selection; Return confirms an area selection.
 - [manual] The captured screenshot opens in the Floating Editor without an intermediate save dialog.
 - [manual] Capture works on each connected display, including mixed-resolution displays.
 
 UX:
-- Flow: menu command or shortcut -> select display/window/area -> Return or click confirms -> Floating Editor; Escape cancels.
-- Surface: lightweight capture overlay; selection happens over the screen being captured.
-- States: area selection shows its bounds and dimensions; window selection highlights the target; capture errors explain how to grant Screen Recording access in System Settings.
-- Words: "Select an area", "Select a window", "Select a display", "Capture".
-- Access: keyboard can move and resize an area selection; VoiceOver announces selection bounds and confirmation/cancel actions; selection is not communicated by color alone.
+- Flow: Settings -> Capture -> Include Window Shadow toggle sets the window capture appearance; menu command or shortcut -> select display/window/area -> Return or click confirms -> Floating Editor; Escape cancels.
+- Surface: lightweight capture overlay for selection, plus the Include Window Shadow toggle in Settings.
+- States: Include Window Shadow is off by default; area selection shows its bounds and dimensions; window selection highlights the target; capture errors explain how to grant Screen Recording access in System Settings.
+- Words: "Select an area", "Select a window", "Select a display", "Capture", "Include Window Shadow".
+- Access: keyboard can move and resize an area selection; VoiceOver announces selection bounds and confirmation/cancel actions; Include Window Shadow is keyboard accessible; selection is not communicated by color alone.
 
 Status: done
 
@@ -109,6 +110,7 @@ Depends: S-004
 
 Acceptance:
 - [manual] I can add, select, move, and remove arrow, shape, text, pen, redaction, and blur marks.
+- [manual] The Arrow toolbar action opens a popup with Solid, Open, Dashed, and Double styles; the selected style applies to new arrows and existing arrows keep their saved style.
 - [manual] Markup stays editable in the Floating Editor until I close or export the screenshot.
 - [manual] Undo and Redo restore the previous markup state.
 - [manual] Redacted pixels are permanently covered in copied, saved, and dragged output; the original pixels cannot be recovered from the exported image.
@@ -119,6 +121,10 @@ UX:
 - Surface: tools in the Floating Editor toolbar; selecting a tool changes how the next canvas gesture behaves.
 - States: selected marks show handles; empty text edits can be canceled with Escape; redaction uses a solid opaque fill and is identified by a label as well as color.
 - Words: "Arrow", "Shape", "Text", "Pen", "Redact", "Blur", "Undo", "Redo".
+- Flow: choose an Arrow Style from the Arrow toolbar popup -> draw an arrow -> the selected style remains active for the next arrow.
+- Surface: popup menu attached to Arrow, a few related choices tied to one toolbar action.
+- States: Solid is the default; the current style is checked in the popup and exposed as Arrow's accessibility value.
+- Words: "Solid", "Open", "Dashed", "Double", "Arrow Style".
 - Access: every tool has a keyboard shortcut, VoiceOver name, and visible focus state; Escape exits text editing or the active tool before closing the editor.
 
 Status: done
@@ -208,6 +214,8 @@ Acceptance:
 - Background and Aspect Ratio open toolbar popovers with visual previews; Device Frame remains a toolbar menu and Fine Tune opens a toolbar popover. Styling controls follow Undo/Redo behind a separator; Copy, Save, and Drag to Save remain at the trailing end.
 - Backdrop presets preview solid, gradient, and textured backgrounds as I choose them, including Coral, Lagoon, Lavender, Amber, Moss, Sand, Graphite Grid, and Rose Dots.
 - Padding, screenshot corner radius, overall picture corner radius, shadow blur, and shadow opacity have adjustable values.
+- Reset Appearance is a toolbar action immediately after Fine Tune. It sets Background to None, Aspect Ratio to Original, Device Frame to None, sets padding and both corner radii to zero, and disables Shadow with blur and opacity set to zero.
+- The Fine Tune popover does not contain a Reset Appearance button.
 - The default picture uses a textured linen backdrop and tighter padding.
 - Aspect Ratio offers Original, 1:1, 4:3, and 16:9; the canvas adds space around the unchanged screenshot to match the selected ratio, and portrait images stay portrait.
 - Optional Window, Mac, and phone frames are mutually exclusive. Window adds a standard macOS title bar with traffic lights.
@@ -216,9 +224,9 @@ Acceptance:
 - Copy, Save, drag, and the editor preview use the same appearance settings.
 
 UX:
-- Flow: choose a markup tool and color in the toolbar -> open Background or Aspect Ratio to preview and choose, select Device Frame, or open Fine Tune -> Copy, Save, or drag.
-- Surface: icon-only styling controls after Undo/Redo; Background and Aspect Ratio use preview popovers, Device Frame uses a menu, and Fine Tune uses a popover for sliders and reset.
-- States: default is a linen backdrop with adjustable padding and shadow; Reset Appearance restores defaults; preview updates while settings change.
+- Flow: choose a markup tool and color in the toolbar -> open Background or Aspect Ratio to preview and choose, select Device Frame, adjust Fine Tune, or choose Reset Appearance -> Copy, Save, or drag.
+- Surface: icon-only styling controls after Undo/Redo; Background and Aspect Ratio use preview popovers, Device Frame uses a menu, Fine Tune uses a popover for sliders, and Reset Appearance is a toolbar action immediately after Fine Tune.
+- States: default is a linen backdrop with adjustable padding and shadow; Reset Appearance clears the backdrop, frame, padding, corner radii, and shadow, and restores the original aspect ratio; preview updates while settings change.
 - Words: “Markup Color”, “Custom Color”, “Background”, “Padding”, “Screenshot Corners”, “Picture Corners”, “Shadow”, “Shadow Blur”, “Shadow Opacity”, “Aspect Ratio”, “Original”, “1:1”, “4:3”, “16:9”, “Device Frame”, “Fine Tune”, “Reset Appearance”.
 - Access: color swatches and all backdrop controls are keyboard accessible and VoiceOver labeled.
 
@@ -292,6 +300,50 @@ UX:
 - States: editor open makes Freeshots a regular app; closing the last window hides it from the app switcher and leaves the menu bar extra active.
 - Words: “Freeshots”, “About Freeshots”, “Hide Freeshots”, “Quit Freeshots”.
 - Access: Command-Tab uses the macOS app switcher; Quit Freeshots is available by keyboard and VoiceOver in the app menu.
+
+### S-015 Start Freeshots at login
+
+As the user, I can choose to have Freeshots start automatically when I log in.
+
+Screens: 09-general-settings.png
+
+Acceptance:
+- [snap] General settings show the startup toggle, status, and any approval action without scrolling.
+- [manual] General settings include a Start Freeshots at Login option that is off by default.
+- [manual] Turning the option on registers Freeshots as a macOS login item; turning it off removes the registration.
+- [manual] Freeshots shows whether the login item is enabled or requires approval, and provides a direct way to open the Login Items section of System Settings when approval is needed.
+- [manual] After login, Freeshots starts as its menu bar utility without opening a capture or editor window.
+- [manual] The preference and registration remain consistent after quitting and reopening Freeshots.
+
+UX:
+- Flow: Settings -> General -> turn on Start Freeshots at Login -> approve in System Settings if requested -> Freeshots starts at the next login; turn it off to remove the login item.
+- Surface: Settings toggle, because it changes one persistent app preference.
+- States: off; enabled; approval required with an Open Login Items Settings action; registration failure with a short explanation and retry guidance.
+- Words: “Start Freeshots at Login”, “Open Login Items Settings”.
+- Access: the toggle and settings link are keyboard accessible and VoiceOver labeled; the enabled or approval-required state is stated in text.
+
+Status: doing
+
+### S-016 Choose the interface appearance
+
+As the user, I can have Freeshots follow macOS appearance or always use Light or Dark appearance.
+
+Screens: 10-appearance-settings.png
+
+Acceptance:
+- [snap] Settings > Appearance offers System, Light, and Dark choices.
+- [manual] System follows the current macOS appearance; Light and Dark keep Freeshots in the selected appearance.
+- [manual] The selected appearance applies to the Floating Editor, Settings, and other Freeshots views, and remains selected after relaunch.
+- [manual] System is selected by default for existing and new users.
+
+UX:
+- Flow: Settings -> Appearance -> select System, Light, or Dark -> Freeshots updates immediately; close Settings or choose another option.
+- Surface: Appearance Settings tab, because this is a persistent app-wide preference.
+- States: System is the default; Light and Dark apply immediately and remain selected after relaunch.
+- Words: “Appearance”, “System”, “Light”, “Dark”.
+- Access: native radio choices work by keyboard and VoiceOver; selection is not communicated by color alone.
+
+Status: doing
 
 ## Later
 

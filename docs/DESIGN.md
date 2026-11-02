@@ -9,7 +9,7 @@ Menu bar extra with capture overlays, a floating screenshot editor, and a Settin
 - **Menu bar:** Open Image, Capture Area, Capture Window, Capture Display, Show Last Screenshot when available, Settings, Quit.
 - **Capture overlay:** choose or confirm the screen content to capture; Escape cancels.
 - **Floating Editor:** full-width screenshot canvas beneath a compact toolbar. Markup, history, and color lead; Background, Aspect Ratio, Device Frame, and Fine Tune follow Undo/Redo behind a separator; Copy, Save, and drag stay at the trailing end. Background and Aspect Ratio open visual previews, and Fine Tune opens an anchored popover.
-- **Settings:** Keyboard Shortcuts, Editor preferences, and Privacy.
+- **Settings:** General (Capture, Editor, and Startup preferences), Appearance, Keyboard Shortcuts, and Permissions, each in its own native Settings tab. The selected tab is remembered.
 
 ## Command map
 
