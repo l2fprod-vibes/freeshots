@@ -97,7 +97,8 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
             ZIP_NAME="Freeshots-${VERSION}.zip"
           else
-            ASSET_CHANNEL="${GITHUB_REF_NAME//\//-}"
+            CHANNEL="build/${GITHUB_REF_NAME}"
+            ASSET_CHANNEL="${CHANNEL//\//-}"
             ZIP_NAME="Freeshots-${ASSET_CHANNEL}.zip"
           fi
           KEYCHAIN_PATH="$RUNNER_TEMP/freeshots-signing.keychain-db"
