@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-26
+    runs-on: xcode-27
     steps:
       - name: Check out Freeshots
         uses: actions/checkout@v4

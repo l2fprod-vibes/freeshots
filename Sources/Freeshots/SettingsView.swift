@@ -139,7 +139,7 @@ private struct GeneralSettingsPane: View {
             Section("Startup") {
                 Toggle("Start Freeshots at Login", isOn: Binding(
                     get: { loginItemStatus == .enabled || loginItemStatus == .requiresApproval },
-                    set: setLoginItemEnabled
+                    set: { enabled in setLoginItemEnabled(enabled) }
                 ))
                 .controlSize(.mini)
 
