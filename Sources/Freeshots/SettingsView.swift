@@ -163,14 +163,16 @@ private struct GeneralSettingsPane: View {
         .onChange(of: rememberLastScreenshot) { _, enabled in
             if !enabled { UserDefaults.standard.removeObject(forKey: "lastScreenshot") }
         }
-        .task {
-            while !Task.isCancelled {
-                refreshLoginItemStatus()
-                do {
-                    try await Task.sleep(for: .seconds(loginItemStatus == .requiresApproval ? 2 : 20))
-                } catch {
-                    break
-                }
+        .task { await pollLoginItemStatus() }
+    }
+
+    private func pollLoginItemStatus() async {
+        while !Task.isCancelled {
+            refreshLoginItemStatus()
+            do {
+                try await Task.sleep(for: .seconds(loginItemStatus == .requiresApproval ? 2 : 20))
+            } catch {
+                break
             }
         }
     }
@@ -278,14 +280,16 @@ private struct PermissionSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .task {
-            while !Task.isCancelled {
-                screenRecordingAllowed = CGPreflightScreenCaptureAccess()
-                do {
-                    try await Task.sleep(for: .seconds(screenRecordingAllowed ? 20 : 2))
-                } catch {
-                    break
-                }
+        .task { await pollScreenRecordingPermission() }
+    }
+
+    private func pollScreenRecordingPermission() async {
+        while !Task.isCancelled {
+            screenRecordingAllowed = CGPreflightScreenCaptureAccess()
+            do {
+                try await Task.sleep(for: .seconds(screenRecordingAllowed ? 20 : 2))
+            } catch {
+                break
             }
         }
     }
