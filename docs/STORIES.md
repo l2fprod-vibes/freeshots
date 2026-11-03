@@ -230,6 +230,8 @@ UX:
 - Words: “Markup Color”, “Custom Color”, “Background”, “Padding”, “Screenshot Corners”, “Picture Corners”, “Shadow”, “Shadow Blur”, “Shadow Opacity”, “Aspect Ratio”, “Original”, “1:1”, “4:3”, “16:9”, “Device Frame”, “Fine Tune”, “Reset Appearance”.
 - Access: color swatches and all backdrop controls are keyboard accessible and VoiceOver labeled.
 
+Status: done
+
 ### S-011 Open a local image
 
 As the user, I open an image from the menu bar and edit it in the Floating Editor.
@@ -245,6 +247,8 @@ UX:
 - States: unsupported or unreadable images leave the current editor unchanged.
 - Words: “Open Image…”, “Open”, “Cancel”.
 - Access: the open panel follows standard macOS keyboard and VoiceOver behavior.
+
+Status: done
 
 ### S-010 Reopen the last screenshot
 
@@ -262,6 +266,8 @@ UX:
 - States: command is absent when no screenshot is stored or remembering is disabled.
 - Words: “Remember Last Screenshot”, “Show Last Screenshot”.
 - Access: both controls are keyboard navigable and VoiceOver labeled.
+
+Status: done
 
 ### S-012 Name screenshots and show the name in the Floating Editor
 
@@ -283,6 +289,8 @@ UX:
 - Words: “Screenshot Name”, title bar shows the current name, Save and Drag to Save prefill the same name.
 - Access: title is exposed through the standard window title for VoiceOver; save panel filename remains editable with standard keyboard behavior.
 
+Status: done
+
 ### S-013 Show Freeshots in the app switcher while the Floating Editor is open
 
 As the user, I can switch to the open screenshot editor with Command-Tab and quit Freeshots with Command-Q from the macOS app menu.
@@ -300,6 +308,8 @@ UX:
 - States: editor open makes Freeshots a regular app; closing the last window hides it from the app switcher and leaves the menu bar extra active.
 - Words: “Freeshots”, “About Freeshots”, “Hide Freeshots”, “Quit Freeshots”.
 - Access: Command-Tab uses the macOS app switcher; Quit Freeshots is available by keyboard and VoiceOver in the app menu.
+
+Status: done
 
 ### S-015 Start Freeshots at login
 
@@ -322,7 +332,7 @@ UX:
 - Words: “Start Freeshots at Login”, “Open Login Items Settings”.
 - Access: the toggle and settings link are keyboard accessible and VoiceOver labeled; the enabled or approval-required state is stated in text.
 
-Status: doing
+Status: done
 
 ### S-016 Choose the interface appearance
 
@@ -343,7 +353,7 @@ UX:
 - Words: “Appearance”, “System”, “Light”, “Dark”.
 - Access: native radio choices work by keyboard and VoiceOver; selection is not communicated by color alone.
 
-Status: doing
+Status: done
 
 ## Later
 
@@ -372,3 +382,5 @@ UX:
 - States: missing access explains the reason and offers Open System Settings and Skip for Now; granted access confirms readiness and continues; closing while access is missing counts as skipping.
 - Words: “Screen Recording Access”, “Allow Screen Recording”, “Open System Settings”, “Skip for Now”, “Screen Recording is ready”, “Continue”, “Check Permissions Again”.
 - Access: Continue is the default action when access is granted; Escape skips; controls are keyboard navigable and VoiceOver labeled.
+
+Status: dropped

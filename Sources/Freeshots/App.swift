@@ -61,7 +61,9 @@ final class CaptureCoordinator {
     }
 
     func showFloatingEditor() {
+        NSApp.unhide(nil)
         NSApp.setActivationPolicy(.regular)
+        (NSApp.delegate as? AppDelegate)?.showApplicationMenu()
         NSApp.activate(ignoringOtherApps: true)
         if let editorPanel {
             editorPanel.orderFrontRegardless()
@@ -98,12 +100,9 @@ final class CaptureCoordinator {
 
     private func editorDidClose(_ panel: FloatingEditorPanel) {
         DispatchQueue.main.async {
-            let anotherWindowIsVisible = NSApp.windows.contains {
-                $0 !== panel && $0.isVisible && !$0.isMiniaturized
-            }
-            if !anotherWindowIsVisible {
-                NSApp.setActivationPolicy(.accessory)
-            }
+            NSApp.setActivationPolicy(.accessory)
+            (NSApp.delegate as? AppDelegate)?.hideApplicationMenu()
+            NSApp.hide(nil)
         }
     }
 
@@ -378,10 +377,10 @@ private struct CaptureMenu: View {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionWindow: NSWindow?
+    private var applicationMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-        installApplicationMenu()
         if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] != "1",
            !CGPreflightScreenCaptureAccess(),
            !UserDefaults.standard.bool(forKey: "permissionOnboardingSkipped") {
@@ -444,17 +443,31 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private func installApplicationMenu() {
-        let mainMenu = NSMenu()
-        let appMenuItem = NSMenuItem()
+    func showApplicationMenu() {
+        if let applicationMenuItem {
+            applicationMenuItem.isHidden = false
+            return
+        }
+
+        let mainMenu = NSApp.mainMenu ?? NSMenu()
+        let appMenuItem = mainMenu.items.first(where: { $0.title == "Freeshots" })
+            ?? NSMenuItem(title: "Freeshots", action: nil, keyEquivalent: "")
         let appMenu = NSMenu(title: "Freeshots")
         appMenu.addItem(NSMenuItem(title: "About Freeshots", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
         appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(title: "Hide Freeshots", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
         appMenu.addItem(NSMenuItem(title: "Quit Freeshots", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appMenuItem.submenu = appMenu
-        mainMenu.addItem(appMenuItem)
+        if !mainMenu.items.contains(where: { $0 === appMenuItem }) {
+            mainMenu.insertItem(appMenuItem, at: 0)
+        }
+        appMenuItem.isHidden = false
         NSApp.mainMenu = mainMenu
+        applicationMenuItem = appMenuItem
+    }
+
+    func hideApplicationMenu() {
+        applicationMenuItem?.isHidden = true
     }
 }
 
