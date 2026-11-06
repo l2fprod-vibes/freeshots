@@ -37,6 +37,7 @@ final class CaptureCoordinator {
     var requestedMode: CaptureMode?
     var screenshot: NSImage?
     var screenshotName = ScreenshotExport.defaultName
+    private(set) var hasRememberedScreenshot = false
     var captureError: String?
     var screenRecordingPermissionMissing = false
     var statusMessage: String?
@@ -56,8 +57,15 @@ final class CaptureCoordinator {
     private var editorPanel: NSPanel?
 
     private init() {
+        UserDefaults.standard.removeObject(forKey: "lastScreenshot")
+        hasRememberedScreenshot = LastScreenshotStore.hasImage
         if let data = UserDefaults.standard.data(forKey: "screenshotAppearance"),
            let value = try? JSONDecoder().decode(ScreenshotAppearance.self, from: data) { appearance = value }
+    }
+
+    func clearRememberedScreenshot() {
+        LastScreenshotStore.clear()
+        hasRememberedScreenshot = false
     }
 
     var clipboardContainsImage: Bool {
@@ -111,9 +119,13 @@ final class CaptureCoordinator {
     }
 
     func showLastScreenshot() {
-        guard let data = UserDefaults.standard.data(forKey: "lastScreenshot"), let image = NSImage(data: data) else { return }
+        guard let remembered = LastScreenshotStore.load() else {
+            hasRememberedScreenshot = false
+            return
+        }
+        let image = remembered.image
         screenshot = image
-        screenshotName = UserDefaults.standard.string(forKey: "lastScreenshotName") ?? ScreenshotExport.defaultName
+        screenshotName = remembered.name
         editorPanel?.title = screenshotName
         requestedMode = nil
         markup.reset()
@@ -204,14 +216,16 @@ final class CaptureCoordinator {
                 screenshot = image
                 screenshotName = mode == .window ? ScreenshotExport.capturedWindowName() : ScreenshotExport.defaultName
                 editorPanel?.title = screenshotName
-                if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), let data = image.tiffRepresentation {
-                    UserDefaults.standard.set(data, forKey: "lastScreenshot")
-                    UserDefaults.standard.set(screenshotName, forKey: "lastScreenshotName")
+                var couldNotRememberScreenshot = false
+                if UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true {
+                    let saved = LastScreenshotStore.save(image, name: screenshotName)
+                    hasRememberedScreenshot = saved || LastScreenshotStore.hasImage
+                    couldNotRememberScreenshot = !saved
                 }
                 requestedMode = mode
                 captureError = nil
                 screenRecordingPermissionMissing = false
-                statusMessage = nil
+                statusMessage = couldNotRememberScreenshot ? "Unable to remember the last screenshot." : nil
                 savedAnnotations = nil
                 markup.reset()
                 completion()
@@ -350,6 +364,51 @@ enum ScreenshotExport {
     }
 }
 
+private enum LastScreenshotStore {
+    private static let legacyImageKey = "lastScreenshot"
+    private static let nameKey = "lastScreenshotName"
+
+    private static var directoryURL: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("Freeshots", isDirectory: true)
+    }
+
+    private static var imageURL: URL? {
+        directoryURL?.appendingPathComponent("LastScreenshot.tiff", isDirectory: false)
+    }
+
+    static var hasImage: Bool {
+        guard let imageURL else { return false }
+        return FileManager.default.fileExists(atPath: imageURL.path)
+    }
+
+    static func load() -> (image: NSImage, name: String)? {
+        guard let imageURL, let image = NSImage(contentsOf: imageURL) else { return nil }
+        let name = UserDefaults.standard.string(forKey: nameKey) ?? ScreenshotExport.defaultName
+        return (image, name)
+    }
+
+    @discardableResult
+    static func save(_ image: NSImage, name: String) -> Bool {
+        guard let imageURL, let data = image.tiffRepresentation else { return false }
+        do {
+            try FileManager.default.createDirectory(at: imageURL.deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+            try data.write(to: imageURL, options: .atomic)
+            UserDefaults.standard.set(name, forKey: nameKey)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    static func clear() {
+        if let imageURL { try? FileManager.default.removeItem(at: imageURL) }
+        UserDefaults.standard.removeObject(forKey: nameKey)
+        UserDefaults.standard.removeObject(forKey: legacyImageKey)
+    }
+}
+
 enum CaptureMode: CaseIterable, Identifiable {
     case area
     case window
@@ -385,7 +444,9 @@ private struct CaptureMenu: View {
         Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }
         Button("Capture Display") { open(.display) }
-        if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), UserDefaults.standard.data(forKey: "lastScreenshot") != nil { Button("Show Last Screenshot") { coordinator.showLastScreenshot() } }
+        if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), coordinator.hasRememberedScreenshot {
+            Button("Show Last Screenshot") { coordinator.showLastScreenshot() }
+        }
         Divider()
         Button("Settings…") { openSettings() }
             .keyboardShortcut(",", modifiers: .command)

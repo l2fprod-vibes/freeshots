@@ -161,7 +161,7 @@ private struct GeneralSettingsPane: View {
         }
         .formStyle(.grouped)
         .onChange(of: rememberLastScreenshot) { _, enabled in
-            if !enabled { UserDefaults.standard.removeObject(forKey: "lastScreenshot") }
+            if !enabled { CaptureCoordinator.shared.clearRememberedScreenshot() }
         }
         .task { await pollLoginItemStatus() }
     }

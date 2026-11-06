@@ -256,7 +256,8 @@ As the user, I can choose whether Freeshots remembers the latest capture and reo
 
 Acceptance:
 - Remember Last Screenshot is enabled by default and can be turned off in Settings.
-- The last capture is stored only on this Mac.
+- The last capture is stored as a local file in Application Support; preferences store only its name.
+- Disabling Remember Last Screenshot removes the local image.
 - Show Last Screenshot appears in the menu bar menu when a remembered capture exists.
 - Choosing it opens the Floating Editor with the remembered image.
 

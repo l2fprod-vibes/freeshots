@@ -29,3 +29,13 @@ Cause: disabled shadow settings were conditionally removed and the popover could
 Fix: keep both sliders visible and disabled when Shadow is off, and give Fine Tune enough height to show all settings.
 
 Rule: keep dependent appearance controls visible and disable them when their parent setting is off.
+
+## Remembered screenshots exceeded the preferences size limit
+
+Symptom: macOS logged that Freeshots attempted to store at least 4 MB in UserDefaults, and large screenshots could not be remembered reliably.
+
+Cause: the full TIFF image was stored as a UserDefaults value.
+
+Fix: store the TIFF under the app's local Application Support directory and keep only the screenshot name in UserDefaults; remove the obsolete image preference.
+
+Rule: store screenshot bytes in a local file and reserve UserDefaults for small preferences and identifiers.
