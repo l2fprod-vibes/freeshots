@@ -362,6 +362,7 @@ As the user, I open an image copied from another app in the Floating Editor.
 
 Acceptance:
 - [manual] Open from Clipboard is disabled unless the clipboard contains data AppKit can read as an image.
+- [manual] After Copy places an image on the clipboard, Open from Clipboard becomes enabled in the menu bar menu.
 - [manual] Open from Clipboard opens image data from the current clipboard in the Floating Editor.
 - [manual] The image supports the existing markup, appearance, copy, save, and drag actions.
 - [manual] When the clipboard has no readable image, the current editor remains unchanged and explains how to retry.

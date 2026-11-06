@@ -68,8 +68,10 @@ final class CaptureCoordinator {
         hasRememberedScreenshot = false
     }
 
-    var clipboardContainsImage: Bool {
-        NSPasteboard.general.canReadObject(forClasses: [NSImage.self], options: nil)
+    private(set) var clipboardContainsImage = false
+
+    func refreshClipboardAvailability() {
+        clipboardContainsImage = NSPasteboard.general.canReadObject(forClasses: [NSImage.self], options: nil)
     }
 
     func showFloatingEditor() {
@@ -161,6 +163,7 @@ final class CaptureCoordinator {
     }
 
     func openImageFromClipboard() {
+        refreshClipboardAvailability()
         guard clipboardContainsImage, let image = NSImage(pasteboard: .general) else {
             statusMessage = "No image found on the clipboard. Copy an image and try again."
             return
@@ -262,6 +265,7 @@ final class CaptureCoordinator {
         pasteboard.clearContents()
         if pasteboard.setData(data, forType: .png) {
             statusMessage = nil
+            refreshClipboardAvailability()
         } else {
             statusMessage = "Unable to copy screenshot. Try again."
         }
@@ -431,6 +435,7 @@ private struct CaptureMenu: View {
 
     var body: some View {
         menuContent
+            .onAppear { coordinator.refreshClipboardAvailability() }
     }
 
     @ViewBuilder

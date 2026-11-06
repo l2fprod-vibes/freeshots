@@ -39,3 +39,13 @@ Cause: the full TIFF image was stored as a UserDefaults value.
 Fix: store the TIFF under the app's local Application Support directory and keep only the screenshot name in UserDefaults; remove the obsolete image preference.
 
 Rule: store screenshot bytes in a local file and reserve UserDefaults for small preferences and identifiers.
+
+## Clipboard import menu state stayed disabled after Copy
+
+Symptom: Open from Clipboard remained disabled after Copy placed an image on the clipboard.
+
+Cause: the menu depended on a computed pasteboard check that SwiftUI did not observe for changes.
+
+Fix: store clipboard image availability as observable state, refresh it after Freeshots copies an image and when the menu opens, and check again when importing.
+
+Rule: refresh observable clipboard state after app writes and before clipboard actions; do not rely on an unobserved computed pasteboard value to redraw a menu.
