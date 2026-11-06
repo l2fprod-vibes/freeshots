@@ -9,6 +9,7 @@
 | Include Window Shadow | Add the system shadow to a window capture | window shadow |
 | Capture Display | Capture one selected display | full screen grab |
 | Open Image | Open a local image in the Floating Editor | import screenshot |
+| Open from Clipboard | Open a copied image in the Floating Editor | paste image |
 | Screen Recording Permission | macOS access required to capture the screen | recording permission |
 | Floating Editor | The panel that displays and marks up the current screenshot | viewer, editor window |
 | Markup | Editable visual objects on a screenshot | annotations, doodles |

@@ -38,10 +38,9 @@ public struct ScreenshotArtworkView: View {
                     .position(x: layout.backdrop.midX, y: layout.backdrop.midY)
                 if appearance.frame != .none {
                     DeviceFramePreview(frame: appearance.frame, frameRect: layout.frame, scale: layout.scale,
-                                       windowColor: windowColor)
-                        .shadow(color: .black.opacity(appearance.shadowEnabled ? appearance.shadowOpacity : 0),
-                                radius: appearance.shadowBlur * layout.scale,
-                                y: appearance.shadowBlur * layout.scale * 0.35)
+                                       windowColor: windowColor,
+                                       shadowOpacity: appearance.shadowEnabled ? appearance.shadowOpacity : 0,
+                                       shadowBlur: appearance.shadowBlur)
                         .position(x: layout.frame.midX, y: layout.frame.midY)
                 }
                 Image(nsImage: image)
@@ -184,12 +183,16 @@ private struct DeviceFramePreview: View {
     let frameRect: CGRect
     let scale: CGFloat
     let windowColor: Color
+    let shadowOpacity: Double
+    let shadowBlur: Double
 
     var body: some View {
         let radius: CGFloat = frame == .phone ? 48 : frame == .window ? 10 : 18
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: radius * scale, style: .continuous)
                 .fill(frame == .window ? windowColor : Color(white: 0.08))
+                .shadow(color: .black.opacity(shadowOpacity), radius: shadowBlur * scale,
+                        y: shadowBlur * scale * 0.35)
             if frame == .window {
                 VStack(spacing: 0) {
                     HStack(spacing: 8 * scale) {

@@ -144,6 +144,24 @@ final class CaptureCoordinator {
         }
     }
 
+    func openImageFromClipboard() {
+        guard let image = NSImage(pasteboard: .general) else {
+            statusMessage = "No image found on the clipboard. Copy an image and try again."
+            return
+        }
+        guard confirmClose() else { return }
+        screenshot = image
+        screenshotName = "Clipboard Image"
+        editorPanel?.title = screenshotName
+        requestedMode = nil
+        captureError = nil
+        screenRecordingPermissionMissing = false
+        statusMessage = nil
+        savedAnnotations = nil
+        markup.reset()
+        showFloatingEditor()
+    }
+
     func writePreviewSnapshot(to url: URL) {
         guard let editorPanel, let content = editorPanel.contentView,
               let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) else { return }
@@ -356,6 +374,8 @@ private struct CaptureMenu: View {
     private var menuContent: some View {
         Button("Open Image…") { coordinator.openImage() }
             .keyboardShortcut("o", modifiers: .command)
+        Button("Open from Clipboard") { coordinator.openImageFromClipboard() }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
         Divider()
         Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }

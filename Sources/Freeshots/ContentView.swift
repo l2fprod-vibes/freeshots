@@ -332,15 +332,14 @@ private struct FineTunePopover: View {
                 appearanceSlider("Screenshot Corners", value: $coordinator.appearance.cornerRadius, range: 0...64, step: 2)
                 appearanceSlider("Picture Corners", value: $coordinator.appearance.backdropCornerRadius, range: 0...64, step: 2)
                 Toggle("Shadow", isOn: $coordinator.appearance.shadowEnabled)
-                if coordinator.appearance.shadowEnabled {
-                    appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
-                    appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
-                }
+                appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
+                    .disabled(!coordinator.appearance.shadowEnabled)
+                appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
+                    .disabled(!coordinator.appearance.shadowEnabled)
             }
             .padding(16)
         }
-        .frame(width: 300)
-        .frame(maxHeight: 600)
+        .frame(width: 300, height: 420)
         .accessibilityLabel("Fine tune screenshot appearance")
     }
 

@@ -355,6 +355,25 @@ UX:
 
 Status: done
 
+### S-017 Open an image from the clipboard
+
+As the user, I open an image copied from another app in the Floating Editor.
+
+Acceptance:
+- [manual] Open from Clipboard opens image data from the current clipboard in the Floating Editor.
+- [manual] The image supports the existing markup, appearance, copy, save, and drag actions.
+- [manual] When the clipboard has no readable image, the current editor remains unchanged and explains how to retry.
+- [manual] Replacing an edited image asks before discarding markup; clipboard data stays local.
+
+UX:
+- Flow: menu bar -> Open from Clipboard (or Command-Shift-O) -> image opens in the Floating Editor; no image shows a retry message; canceling the discard prompt keeps editing.
+- Surface: menu bar command, matching Open Image… and requiring no extra input.
+- States: readable clipboard image opens; empty or unsupported clipboard shows “No image found on the clipboard. Copy an image and try again.”; unsaved markup uses the existing discard confirmation.
+- Words: “Open from Clipboard”, “No image found on the clipboard. Copy an image and try again.”
+- Access: keyboard and VoiceOver use the menu label; Command-Shift-O is shown in the menu.
+
+Status: todo — implementation builds; pending UI and clipboard interaction review because no Apple Development signing identity is available for the snapshot install.
+
 ## Later
 
 - **V2:** Record a display, window, or area as a local video; preview and save or drag the clip. Audio, camera, and video editing scope remain undecided.
