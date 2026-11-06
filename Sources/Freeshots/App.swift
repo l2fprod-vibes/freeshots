@@ -60,6 +60,10 @@ final class CaptureCoordinator {
            let value = try? JSONDecoder().decode(ScreenshotAppearance.self, from: data) { appearance = value }
     }
 
+    var clipboardContainsImage: Bool {
+        NSPasteboard.general.canReadObject(forClasses: [NSImage.self], options: nil)
+    }
+
     func showFloatingEditor() {
         NSApp.unhide(nil)
         NSApp.setActivationPolicy(.regular)
@@ -145,7 +149,7 @@ final class CaptureCoordinator {
     }
 
     func openImageFromClipboard() {
-        guard let image = NSImage(pasteboard: .general) else {
+        guard clipboardContainsImage, let image = NSImage(pasteboard: .general) else {
             statusMessage = "No image found on the clipboard. Copy an image and try again."
             return
         }
@@ -376,6 +380,7 @@ private struct CaptureMenu: View {
             .keyboardShortcut("o", modifiers: .command)
         Button("Open from Clipboard") { coordinator.openImageFromClipboard() }
             .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(!coordinator.clipboardContainsImage)
         Divider()
         Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }
