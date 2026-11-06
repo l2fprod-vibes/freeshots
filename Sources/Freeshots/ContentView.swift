@@ -325,21 +325,20 @@ private struct FineTunePopover: View {
     @Bindable var coordinator: CaptureCoordinator
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Fine Tune").font(.headline)
-                appearanceSlider("Padding", value: $coordinator.appearance.padding, range: 0...240, step: 8)
-                appearanceSlider("Screenshot Corners", value: $coordinator.appearance.cornerRadius, range: 0...64, step: 2)
-                appearanceSlider("Picture Corners", value: $coordinator.appearance.backdropCornerRadius, range: 0...64, step: 2)
-                Toggle("Shadow", isOn: $coordinator.appearance.shadowEnabled)
-                appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
-                    .disabled(!coordinator.appearance.shadowEnabled)
-                appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
-                    .disabled(!coordinator.appearance.shadowEnabled)
-            }
-            .padding(16)
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Fine Tune").font(.headline)
+            appearanceSlider("Padding", value: $coordinator.appearance.padding, range: 0...240, step: 8)
+            appearanceSlider("Screenshot Corners", value: $coordinator.appearance.cornerRadius, range: 0...64, step: 2)
+            appearanceSlider("Picture Corners", value: $coordinator.appearance.backdropCornerRadius, range: 0...64, step: 2)
+            Toggle("Shadow", isOn: $coordinator.appearance.shadowEnabled)
+            appearanceSlider("Shadow Blur", value: $coordinator.appearance.shadowBlur, range: 0...64, step: 2)
+                .disabled(!coordinator.appearance.shadowEnabled)
+            appearanceSlider("Shadow Opacity", value: $coordinator.appearance.shadowOpacity, range: 0...0.8, step: 0.04, suffix: "%", multiplier: 100)
+                .disabled(!coordinator.appearance.shadowEnabled)
         }
-        .frame(width: 300, height: 420)
+        .padding(16)
+        .frame(width: 300)
+        .fixedSize(horizontal: false, vertical: true)
         .accessibilityLabel("Fine tune screenshot appearance")
     }
 
