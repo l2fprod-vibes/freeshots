@@ -1,5 +1,6 @@
 import SwiftUI
 import FreeshotsCore
+import FreeshotsRendering
 
 struct ContentView: View {
     @Environment(CaptureCoordinator.self) private var coordinator
@@ -52,6 +53,7 @@ struct ContentView: View {
                 .background(Ink.surface)
             }
         }
+        .focusEffectDisabled()
         .onDeleteCommand { coordinator.markup.removeSelected() }
     }
 }
@@ -61,35 +63,65 @@ private struct EditorToolbar: View {
     @FocusState.Binding var textFieldFocused: Bool
     @State private var backgroundPresented = false
     @State private var aspectRatioPresented = false
+    @State private var deviceFramePresented = false
     @State private var fineTunePresented = false
+    @State private var arrowStylesPresented = false
+    @State private var hoverPopups = HoverPopupCoordinator()
+
+    private func selectArrowStyle(_ style: ArrowStyle) {
+        coordinator.markup.activeArrowStyle = style
+        coordinator.markup.activeTool = .arrow
+        arrowStylesPresented = false
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             ForEach(MarkupTool.allCases) { tool in
                 if tool == .arrow {
-                    Menu {
-                        ForEach(ArrowStyle.allCases) { style in
-                            Button {
-                                coordinator.markup.activeArrowStyle = style
-                                coordinator.markup.activeTool = .arrow
-                            } label: {
-                                if coordinator.markup.activeArrowStyle == style {
-                                    Label(style.title, systemImage: "checkmark")
-                                } else {
-                                    Text(style.title)
-                                }
-                            }
-                        }
+                    Button {
+                        selectArrowStyle(.solid)
                     } label: {
                         Image(systemName: tool.symbol)
                             .font(.system(size: 15, weight: coordinator.markup.activeTool == tool ? .semibold : .regular))
                     }
-                    .menuStyle(.borderlessButton)
                     .buttonStyle(KitToolButtonStyle(selected: coordinator.markup.activeTool == tool))
-                    .help("Choose Arrow Style (A)")
+                    .help("Draw a solid arrow (A). Hover to choose a style.")
                     .accessibilityLabel("Arrow")
                     .accessibilityValue(coordinator.markup.activeArrowStyle.title)
                     .accessibilityAddTraits(coordinator.markup.activeTool == tool ? .isSelected : [])
+                    .keyboardShortcut("a", modifiers: [])
+                    .hoverPopover(isPresented: $arrowStylesPresented) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Arrow Style")
+                                .font(.caption).foregroundStyle(.secondary)
+                                .padding(.horizontal, 8).padding(.bottom, 4)
+                            ForEach(ArrowStyle.allCases) { style in
+                                Button { selectArrowStyle(style) } label: {
+                                    HStack(spacing: 12) {
+                                        ArrowMark(start: CGPoint(x: 4, y: 18), end: CGPoint(x: 44, y: 6),
+                                                  lineWidth: 0.7, colorHex: NSColor.labelColor.hexString, style: style)
+                                            .frame(width: 48, height: 24)
+                                            .accessibilityHidden(true)
+                                        Text(style.title)
+                                        Spacer(minLength: 16)
+                                        Image(systemName: "checkmark")
+                                            .opacity(coordinator.markup.activeTool == .arrow && coordinator.markup.activeArrowStyle == style ? 1 : 0)
+                                    }
+                                    .padding(.horizontal, 8).padding(.vertical, 6)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(KitPopupButtonStyle())
+                                .focusEffectDisabled()
+                                .accessibilityLabel("Draw \(style.title.lowercased()) arrow")
+                            }
+                        }
+                        .padding(8).frame(width: 180)
+                    }
+                    .contextMenu {
+                        ForEach(ArrowStyle.allCases) { style in
+                            Button(style.title) { selectArrowStyle(style) }
+                        }
+                    }
                     .disabled(textFieldFocused)
                 } else {
                     Button { coordinator.markup.activeTool = tool } label: {
@@ -141,7 +173,7 @@ private struct EditorToolbar: View {
                 .help("Preview and choose a background")
                 .accessibilityLabel("Background")
                 .accessibilityValue(coordinator.appearance.backdrop.title)
-                .popover(isPresented: $backgroundPresented, arrowEdge: .bottom) {
+                .hoverPopover(isPresented: $backgroundPresented) {
                     BackgroundPopover(coordinator: coordinator)
                 }
             Button { aspectRatioPresented = true } label: { Image(systemName: "aspectratio") }
@@ -149,20 +181,42 @@ private struct EditorToolbar: View {
                 .help("Preview and choose an aspect ratio")
                 .accessibilityLabel("Aspect Ratio")
                 .accessibilityValue(coordinator.appearance.aspectRatio.title)
-                .popover(isPresented: $aspectRatioPresented, arrowEdge: .bottom) {
+                .hoverPopover(isPresented: $aspectRatioPresented) {
                     AspectRatioPopover(coordinator: coordinator,
                                       imageSize: coordinator.screenshot?.size ?? CGSize(width: 16, height: 9))
                 }
-            appearanceMenu("Device Frame", symbol: "macwindow", selection: coordinator.appearance.frame.title) {
-                ForEach(DeviceFrame.allCases) { frame in
-                    Button(frame.title) { coordinator.appearance.frame = frame }
+            Button { deviceFramePresented = true } label: { Image(systemName: "macwindow") }
+                .buttonStyle(KitToolButtonStyle(selected: deviceFramePresented))
+                .help("Choose a device frame")
+                .accessibilityLabel("Device Frame")
+                .accessibilityValue(coordinator.appearance.frame.title)
+                .hoverPopover(isPresented: $deviceFramePresented) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Device Frame").font(.headline)
+                        ForEach(DeviceFrame.allCases) { frame in
+                            Button {
+                                coordinator.appearance.frame = frame
+                                deviceFramePresented = false
+                            } label: {
+                                HStack {
+                                    Text(frame.title)
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                        .opacity(coordinator.appearance.frame == frame ? 1 : 0)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(KitPopupButtonStyle())
+                                .focusEffectDisabled()
+                        }
+                    }
+                    .padding(16).frame(width: 200)
                 }
-            }
             Button { fineTunePresented = true } label: { Image(systemName: "slider.horizontal.3") }
                 .buttonStyle(KitToolButtonStyle())
                 .help("Adjust fine tune settings")
                 .accessibilityLabel("Fine Tune")
-                .popover(isPresented: $fineTunePresented, arrowEdge: .bottom) {
+                .hoverPopover(isPresented: $fineTunePresented) {
                     FineTunePopover(coordinator: coordinator)
                 }
             toolButton("arrow.counterclockwise", title: "Reset Appearance", help: "Reset screenshot appearance") {
@@ -203,23 +257,11 @@ private struct EditorToolbar: View {
         .frame(height: 48)
         .background(.regularMaterial)
         .accessibilityLabel("Screenshot editing tools")
+        .environment(hoverPopups)
     }
 
     private var toolbarDivider: some View {
         Rectangle().fill(Ink.divider).frame(width: 1, height: 24).padding(.horizontal, 4)
-    }
-
-    private func appearanceMenu<Content: View>(_ title: String, symbol: String, selection: String,
-                                               @ViewBuilder content: () -> Content) -> some View {
-        Menu(content: content) {
-            Image(systemName: symbol)
-        }
-        .menuIndicator(.hidden)
-        .menuStyle(.borderlessButton)
-        .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
-        .help("Choose \(title.lowercased()) (\(selection))")
-        .accessibilityLabel(title)
-        .accessibilityValue(selection)
     }
 
     private func toolButton(_ symbol: String, title: String, help: String, action: @escaping () -> Void) -> some View {
@@ -378,7 +420,12 @@ private struct ColorMenu: View {
         .buttonStyle(KitToolButtonStyle())
         .help("Choose markup color")
         .accessibilityLabel("Markup Color")
-        .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+        .onChange(of: isPresented) { _, presented in
+            if presented {
+                customColor = Color(nsColor: NSColor(hex: coordinator.markup.activeColorHex) ?? .systemRed)
+            }
+        }
+        .hoverPopover(isPresented: $isPresented) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Markup Color").font(.headline)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(26), spacing: 8), count: 4), spacing: 8) {
@@ -409,5 +456,80 @@ private struct ColorMenu: View {
             .padding(16)
             .frame(width: 196)
         }
+    }
+}
+
+@Observable
+private final class HoverPopupCoordinator {
+    var activeID: UUID?
+}
+
+// One owner prevents a previous button from presenting a queued popup.
+private struct HoverPopover<PopoverContent: View>: ViewModifier {
+    @Binding var isPresented: Bool
+    @ViewBuilder var popoverContent: () -> PopoverContent
+    @State private var id = UUID()
+    @State private var transition: Task<Void, Never>?
+    @State private var buttonHovered = false
+    @Environment(HoverPopupCoordinator.self) private var coordinator
+    @Environment(\.isEnabled) private var isEnabled
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { hovering in
+                buttonHovered = hovering
+                transition?.cancel()
+                if hovering && isEnabled {
+                    coordinator.activeID = id
+                    transition = Task { @MainActor in
+                        // Let the previous popover close before presenting the next.
+                        try? await Task.sleep(for: .milliseconds(150))
+                        guard !Task.isCancelled, buttonHovered,
+                              coordinator.activeID == id else { return }
+                        isPresented = true
+                    }
+                } else {
+                    scheduleDismissal()
+                }
+            }
+            .onChange(of: coordinator.activeID) { _, activeID in
+                if activeID != id {
+                    transition?.cancel()
+                    isPresented = false
+                }
+            }
+            .onChange(of: isPresented) { _, presented in
+                if presented { coordinator.activeID = id }
+            }
+            .popover(isPresented: $isPresented, arrowEdge: .bottom) {
+                popoverContent()
+                    .focusEffectDisabled()
+                    .onHover { hovering in
+                        guard coordinator.activeID == id else { return }
+                        transition?.cancel()
+                        if !hovering { scheduleDismissal() }
+                    }
+            }
+            .onDisappear {
+                transition?.cancel()
+                isPresented = false
+                if coordinator.activeID == id { coordinator.activeID = nil }
+            }
+    }
+
+    private func scheduleDismissal() {
+        transition = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, coordinator.activeID == id else { return }
+            isPresented = false
+            coordinator.activeID = nil
+        }
+    }
+}
+
+private extension View {
+    func hoverPopover<Content: View>(isPresented: Binding<Bool>,
+                                     @ViewBuilder content: @escaping () -> Content) -> some View {
+        modifier(HoverPopover(isPresented: isPresented, popoverContent: content))
     }
 }

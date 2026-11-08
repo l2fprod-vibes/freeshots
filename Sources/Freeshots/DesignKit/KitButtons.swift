@@ -35,7 +35,7 @@ private struct KitActionButtonBody: View {
             .frame(height: KitMetric.actionHeight)
             .foregroundStyle(foreground)
             .background(fill, in: shape)
-            .overlay(shape.strokeBorder(state == .focused ? Ink.accentText : .clear, lineWidth: 2))
+            .focusEffectDisabled()
             .scaleEffect(state == .pressed ? 0.98 : 1)
             .opacity(state == .disabled ? 0.4 : 1)
             .contentShape(shape)
@@ -82,7 +82,7 @@ private struct KitToolButtonBody: View {
             .foregroundStyle(state == .selected ? Ink.selectionText : Ink.text)
             .frame(width: KitMetric.toolSize, height: KitMetric.toolSize)
             .background(fill, in: shape)
-            .overlay(shape.strokeBorder(state == .focused ? Ink.accentText : .clear, lineWidth: 2))
+            .focusEffectDisabled()
             .scaleEffect(state == .pressed ? 0.97 : 1)
             .opacity(state == .disabled ? 0.4 : 1)
             .contentShape(shape)
@@ -113,5 +113,28 @@ struct KitToolButton: View {
         .buttonStyle(KitToolButtonStyle(selected: selected))
         .help("\(title) (\(shortcut))")
         .accessibilityLabel(title)
+    }
+}
+
+// Popup rows draw hover feedback themselves rather than using native button chrome.
+struct KitPopupButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        KitPopupButtonBody(configuration: configuration)
+    }
+}
+
+private struct KitPopupButtonBody: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var hovering = false
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(Ink.text)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(hovering || configuration.isPressed ? Ink.selection : .clear,
+                        in: RoundedRectangle(cornerRadius: KitMetric.controlRadius))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .focusEffectDisabled()
     }
 }

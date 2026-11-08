@@ -112,7 +112,7 @@ public struct ScreenshotArtworkView: View {
         ZStack(alignment: .topLeading) {
             switch mark.tool {
             case .arrow:
-                ArrowMark(start: start, end: end, lineWidth: max(5, rect.width * 0.012), colorHex: mark.colorHex, style: mark.arrowStyle)
+                ArrowMark(start: start, end: end, lineWidth: max(2, rect.width * 0.005), colorHex: mark.colorHex, style: mark.arrowStyle)
             case .shape:
                 Rectangle().stroke(markColor(mark.colorHex), lineWidth: 3).frame(width: bounds.width, height: bounds.height)
                     .position(x: bounds.midX, y: bounds.midY)
@@ -129,8 +129,6 @@ public struct ScreenshotArtworkView: View {
                                 .frame(width: max(1, bounds.width), height: max(1, bounds.height))
                                 .position(x: bounds.midX, y: bounds.midY)
                         }
-                        .frame(width: rect.width, height: rect.height, alignment: .topLeading)
-                        .position(x: rect.midX, y: rect.midY)
                 }
             case .pen:
                 Path { path in
@@ -225,47 +223,82 @@ private struct DeviceFramePreview: View {
     }
 }
 
-private struct ArrowMark: View {
+public struct ArrowMark: View {
     let start: CGPoint
     let end: CGPoint
     let lineWidth: CGFloat
     let colorHex: String
     let style: ArrowStyle
 
-    var body: some View {
+    public init(start: CGPoint, end: CGPoint, lineWidth: CGFloat, colorHex: String, style: ArrowStyle) {
+        self.start = start
+        self.end = end
+        self.lineWidth = lineWidth
+        self.colorHex = colorHex
+        self.style = style
+    }
+
+    public var body: some View {
         let angle = atan2(end.y - start.y, end.x - start.x)
-        let headLength = max(18, lineWidth * 4)
-        let halfWidth = lineWidth * 1.5
+        let distance = hypot(end.x - start.x, end.y - start.y)
+        // Grow gently with length, capped at 50% above the original proportions.
+        let lengthScale = 1 + min(0.5, max(0, distance / lineWidth - 40) / 320)
+        let scaledWidth = lineWidth * lengthScale
+        let headLength = min(distance * 0.3, scaledWidth * 13)
+        let halfWidth = scaledWidth * 4.5
         let base = CGPoint(x: end.x - headLength * cos(angle), y: end.y - headLength * sin(angle))
         let left = CGPoint(x: base.x + halfWidth * sin(angle), y: base.y - halfWidth * cos(angle))
         let right = CGPoint(x: base.x - halfWidth * sin(angle), y: base.y + halfWidth * cos(angle))
         let color = Color(nsColor: NSColor(hex: colorHex) ?? .systemRed)
         let shaftEnd = base
-        ZStack {
+        if style == .solid {
+            // Skitch's solid arrow widens from a fine tail into a long, broad head.
+            let solidWidth = scaledWidth
+            let ux = cos(angle), uy = sin(angle)
+            let px = -uy, py = ux
+            let shaftEnd = CGPoint(x: end.x - ux * headLength, y: end.y - uy * headLength)
+            // Keep the head base perpendicular to the shaft, without swept-back corners.
+            let headBase = shaftEnd
+            let headHalfWidth = solidWidth * 4.5
+            let shaftHalfWidth = solidWidth * 1.5
+            let tailHalfWidth = solidWidth * 0.55
             Path { path in
-                path.move(to: start); path.addLine(to: shaftEnd)
-                if style == .double {
-                    let reverseBase = CGPoint(x: start.x + headLength * cos(angle), y: start.y + headLength * sin(angle))
-                    let reverseLeft = CGPoint(x: reverseBase.x - halfWidth * sin(angle), y: reverseBase.y + halfWidth * cos(angle))
-                    let reverseRight = CGPoint(x: reverseBase.x + halfWidth * sin(angle), y: reverseBase.y - halfWidth * cos(angle))
-                    path.move(to: reverseLeft); path.addLine(to: start); path.addLine(to: reverseRight)
-                }
-                if style == .open || style == .dashed {
-                    path.move(to: left); path.addLine(to: end); path.addLine(to: right)
-                }
+                path.move(to: CGPoint(x: start.x + px * tailHalfWidth, y: start.y + py * tailHalfWidth))
+                path.addLine(to: CGPoint(x: shaftEnd.x + px * shaftHalfWidth, y: shaftEnd.y + py * shaftHalfWidth))
+                path.addLine(to: CGPoint(x: headBase.x + px * headHalfWidth, y: headBase.y + py * headHalfWidth))
+                path.addLine(to: end)
+                path.addLine(to: CGPoint(x: headBase.x - px * headHalfWidth, y: headBase.y - py * headHalfWidth))
+                path.addLine(to: CGPoint(x: shaftEnd.x - px * shaftHalfWidth, y: shaftEnd.y - py * shaftHalfWidth))
+                path.addLine(to: CGPoint(x: start.x - px * tailHalfWidth, y: start.y - py * tailHalfWidth))
+                path.closeSubpath()
             }
-            .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round,
-                                             dash: style == .dashed ? [lineWidth * 2, lineWidth * 1.5] : []))
-            if style == .solid || style == .double {
+            .fill(color)
+            .shadow(color: .black.opacity(0.1), radius: 1.5, x: 0, y: 1)
+        } else {
+            ZStack {
                 Path { path in
-                    path.move(to: end); path.addLine(to: left); path.addLine(to: right); path.closeSubpath()
+                    path.move(to: start); path.addLine(to: shaftEnd)
                     if style == .double {
                         let reverseBase = CGPoint(x: start.x + headLength * cos(angle), y: start.y + headLength * sin(angle))
                         let reverseLeft = CGPoint(x: reverseBase.x - halfWidth * sin(angle), y: reverseBase.y + halfWidth * cos(angle))
                         let reverseRight = CGPoint(x: reverseBase.x + halfWidth * sin(angle), y: reverseBase.y - halfWidth * cos(angle))
-                        path.move(to: start); path.addLine(to: reverseLeft); path.addLine(to: reverseRight); path.closeSubpath()
+                        path.move(to: reverseLeft); path.addLine(to: start); path.addLine(to: reverseRight)
                     }
-                }.fill(color)
+                    if style == .open || style == .dashed {
+                        path.move(to: left); path.addLine(to: end); path.addLine(to: right)
+                    }
+                }
+                .stroke(color, style: StrokeStyle(lineWidth: scaledWidth, lineCap: .round, lineJoin: .round,
+                                                 dash: style == .dashed ? [scaledWidth * 2, scaledWidth * 1.5] : []))
+                if style == .double {
+                    Path { path in
+                        path.move(to: end); path.addLine(to: left); path.addLine(to: right); path.closeSubpath()
+                        let reverseBase = CGPoint(x: start.x + headLength * cos(angle), y: start.y + headLength * sin(angle))
+                        let reverseLeft = CGPoint(x: reverseBase.x - halfWidth * sin(angle), y: reverseBase.y + halfWidth * cos(angle))
+                        let reverseRight = CGPoint(x: reverseBase.x + halfWidth * sin(angle), y: reverseBase.y - halfWidth * cos(angle))
+                        path.move(to: start); path.addLine(to: reverseLeft); path.addLine(to: reverseRight); path.closeSubpath()
+                    }.fill(color)
+                }
             }
         }
     }

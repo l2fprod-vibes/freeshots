@@ -110,7 +110,9 @@ Depends: S-004
 
 Acceptance:
 - [manual] I can add, select, move, and remove arrow, shape, text, pen, redaction, and blur marks.
-- [manual] The Arrow toolbar action opens a popup with Solid, Open, Dashed, and Double styles; the selected style applies to new arrows and existing arrows keep their saved style.
+- [manual] The Arrow button selects Solid immediately; hovering reveals a style popover offering Solid, Open, Dashed, and Double, and new arrows use the selected style while existing arrows keep theirs.
+- [manual] A fresh screenshot opens with the Solid Arrow tool active; clicking the Arrow icon selects Solid immediately, while hovering reveals the style picker.
+- [snap] Solid arrows match the Skitch reference: a lightly tapered tail and compact angular head sized consistently against the screenshot, regardless of drag length.
 - [manual] Markup stays editable in the Floating Editor until I close or export the screenshot.
 - [manual] Undo and Redo restore the previous markup state.
 - [manual] Redacted pixels are permanently covered in copied, saved, and dragged output; the original pixels cannot be recovered from the exported image.
@@ -121,9 +123,9 @@ UX:
 - Surface: tools in the Floating Editor toolbar; selecting a tool changes how the next canvas gesture behaves.
 - States: selected marks show handles; empty text edits can be canceled with Escape; redaction uses a solid opaque fill and is identified by a label as well as color.
 - Words: "Arrow", "Shape", "Text", "Pen", "Redact", "Blur", "Undo", "Redo".
-- Flow: choose an Arrow Style from the Arrow toolbar popup -> draw an arrow -> the selected style remains active for the next arrow.
-- Surface: popup menu attached to Arrow, a few related choices tied to one toolbar action.
-- States: Solid is the default; the current style is checked in the popup and exposed as Arrow's accessibility value.
+- Flow: hover the Arrow button (or open its context menu) and choose an Arrow Style -> draw an arrow -> the selected style remains active for the next arrow.
+- Surface: hover popover attached to Arrow, a few related choices tied to one toolbar action; the context menu also exposes every style.
+- States: Style choices preview the actual arrow rendering, including filled and open heads and dashed shafts. Solid is the default; the current style is checked in the popover and exposed as Arrow's accessibility value.
 - Words: "Solid", "Open", "Dashed", "Double", "Arrow Style".
 - Access: every tool has a keyboard shortcut, VoiceOver name, and visible focus state; Escape exits text editing or the active tool before closing the editor.
 
@@ -406,3 +408,7 @@ UX:
 - Access: Continue is the default action when access is granted; Escape skips; controls are keyboard navigable and VoiceOver labeled.
 
 Status: dropped
+
+Toolbar popup interaction:
+- Markup Color, Background, Aspect Ratio, Device Frame, and Fine Tune open on hover or click.
+- Popovers stay open while crossing from the button into the content and dismiss after leaving both.

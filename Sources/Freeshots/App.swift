@@ -23,6 +23,7 @@ struct FreeshotsApp: App {
 
         Settings {
             SettingsView()
+                .focusEffectDisabled()
                 .environment(hotkeys)
                 .themed()
         }
@@ -158,6 +159,10 @@ final class CaptureCoordinator {
         if let editorPanel, editorPanel.isVisible {
             panel.beginSheetModal(for: editorPanel, completionHandler: completion)
         } else {
+            NSApp.unhide(nil)
+            NSApp.setActivationPolicy(.regular)
+            (NSApp.delegate as? AppDelegate)?.showApplicationMenu()
+            NSApp.activate(ignoringOtherApps: true)
             panel.begin(completionHandler: completion)
         }
     }
@@ -231,6 +236,8 @@ final class CaptureCoordinator {
                 statusMessage = couldNotRememberScreenshot ? "Unable to remember the last screenshot." : nil
                 savedAnnotations = nil
                 markup.reset()
+                markup.activeArrowStyle = .solid
+                markup.activeTool = .arrow
                 completion()
             } catch ScreenCaptureService.Failure.permissionDenied {
                 screenRecordingPermissionMissing = true
