@@ -58,6 +58,9 @@ fi
 if [[ -f "$here/Resources/AppIcon.icns" ]]; then
   cp "$here/Resources/AppIcon.icns" "$app/Contents/Resources/"
 fi
+if [[ -f "$here/Resources/made-with-ai-blue-green.png" ]]; then
+  cp "$here/Resources/made-with-ai-blue-green.png" "$app/Contents/Resources/"
+fi
 
 codesign --force --sign "$identity" --options runtime --timestamp "$app"
 echo "built $app"

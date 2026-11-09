@@ -49,3 +49,13 @@ Cause: the menu depended on a computed pasteboard check that SwiftUI did not obs
 Fix: store clipboard image availability as observable state, refresh it after Freeshots copies an image and when the menu opens, and check again when importing.
 
 Rule: refresh observable clipboard state after app writes and before clipboard actions; do not rely on an unobserved computed pasteboard value to redraw a menu.
+
+## Crop selected the wrong screenshot region
+
+Symptom: the crop selection moved correctly, but applying it showed a different part of the screenshot.
+
+Cause: the normalized crop's top-origin Y coordinate was inverted when converting to CGImage pixel coordinates.
+
+Fix: map the crop's `minY` directly to the CGImage pixel row, and keep the drag gesture in a named canvas coordinate space.
+
+Rule: always convert crop coordinates using the target image API's documented origin; do not invert Y unless that API uses a bottom-origin coordinate system.

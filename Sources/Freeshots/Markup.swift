@@ -22,12 +22,15 @@ extension MarkupTool {
 @Observable
 final class MarkupDocument {
     var annotations: [ScreenshotMark] = []
+    var cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    var cropDraft: CGRect?
+    var isCropping = false
     var activeTool: MarkupTool = .select
     var activeColorHex = "E53935"
     var activeArrowStyle: ArrowStyle = .solid
     var selectedID: UUID?
-    @ObservationIgnored private var undoStack: [[ScreenshotMark]] = []
-    @ObservationIgnored private var redoStack: [[ScreenshotMark]] = []
+    @ObservationIgnored private var undoStack: [MarkupHistoryState] = []
+    @ObservationIgnored private var redoStack: [MarkupHistoryState] = []
 
     var selectedMark: ScreenshotMark? { annotations.first { $0.id == selectedID } }
     var canUndo: Bool { !undoStack.isEmpty }
@@ -35,6 +38,9 @@ final class MarkupDocument {
 
     func reset() {
         annotations.removeAll()
+        cropRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+        cropDraft = nil
+        isCropping = false
         selectedID = nil
         activeTool = .select
         undoStack.removeAll()
@@ -42,9 +48,25 @@ final class MarkupDocument {
     }
 
     func beginUndoGroup() {
-        undoStack.append(annotations)
+        undoStack.append(MarkupHistoryState(annotations: annotations, cropRect: cropRect))
         redoStack.removeAll()
     }
+
+    func beginCrop() { isCropping = true; cropDraft = CGRect(x: 0, y: 0, width: 1, height: 1) }
+
+    func updateCropDraft(_ rect: CGRect) {
+        cropDraft = rect.standardized.intersection(CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
+
+    func applyCrop() {
+        guard let cropDraft, cropDraft.width > 0.02, cropDraft.height > 0.02 else { return }
+        beginUndoGroup()
+        cropRect = cropDraft
+        self.cropDraft = nil
+        isCropping = false
+    }
+
+    func cancelCrop() { cropDraft = nil; isCropping = false }
 
     func add(_ annotation: ScreenshotMark) {
         beginUndoGroup()
@@ -73,17 +95,24 @@ final class MarkupDocument {
 
     func undo() {
         guard let previous = undoStack.popLast() else { return }
-        redoStack.append(annotations)
-        annotations = previous
+        redoStack.append(MarkupHistoryState(annotations: annotations, cropRect: cropRect))
+        annotations = previous.annotations
+        cropRect = previous.cropRect
         selectedID = nil
     }
 
     func redo() {
         guard let next = redoStack.popLast() else { return }
-        undoStack.append(annotations)
-        annotations = next
+        undoStack.append(MarkupHistoryState(annotations: annotations, cropRect: cropRect))
+        annotations = next.annotations
+        cropRect = next.cropRect
         selectedID = nil
     }
+}
+
+private struct MarkupHistoryState {
+    let annotations: [ScreenshotMark]
+    let cropRect: CGRect
 }
 
 struct MarkupCanvas: View {
@@ -102,11 +131,16 @@ struct MarkupCanvas: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let imageRect = ScreenshotArtworkView.imageRect(imageSize: image.size, in: geometry.size, appearance: appearance)
+            let visibleCrop = markup.isCropping ? CGRect(x: 0, y: 0, width: 1, height: 1) : markup.cropRect
+            let visibleSize = ScreenshotArtworkView.croppedSize(image.size, cropRect: visibleCrop)
+            let imageRect = ScreenshotArtworkView.imageRect(imageSize: visibleSize, in: geometry.size, appearance: appearance)
+            ZStack {
             ScreenshotArtworkView(image: image, appearance: appearance, annotations: markup.annotations,
+                                  cropRect: visibleCrop,
                                   selectedID: markup.selectedID, draft: draft, selectionColor: Ink.accentText)
             .frame(width: geometry.size.width, height: geometry.size.height)
             .contentShape(Rectangle())
+            .allowsHitTesting(!markup.isCropping)
             .gesture(DragGesture(minimumDistance: markup.activeTool == .select || markup.activeTool == .text ? 0 : 2)
                 .onChanged { value in
                     handleChange(value, in: imageRect)
@@ -114,6 +148,12 @@ struct MarkupCanvas: View {
                 .onEnded { value in
                     handleEnd(value, in: imageRect)
                 })
+                if markup.isCropping, let cropDraft = markup.cropDraft {
+                    CropSelectionOverlay(imageRect: imageRect, canvasSize: geometry.size, selection: cropDraft) {
+                        markup.updateCropDraft($0)
+                    }
+                }
+            }
         }
         .accessibilityLabel("Screenshot markup canvas")
         .onChange(of: markup.activeTool) { _, _ in
@@ -125,8 +165,10 @@ struct MarkupCanvas: View {
     }
 
     private func normalized(_ point: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(x: min(1, max(0, (point.x - rect.minX) / rect.width)),
-                y: min(1, max(0, (point.y - rect.minY) / rect.height)))
+        let localX = min(1, max(0, (point.x - rect.minX) / rect.width))
+        let localY = min(1, max(0, (point.y - rect.minY) / rect.height))
+        return CGPoint(x: markup.cropRect.minX + localX * markup.cropRect.width,
+                       y: markup.cropRect.minY + localY * markup.cropRect.height)
     }
 
     private func handleChange(_ value: DragGesture.Value, in rect: CGRect) {

@@ -19,11 +19,19 @@ struct ContentView: View {
         VStack(spacing: 0) {
             EditorToolbar(coordinator: coordinator, textFieldFocused: $textFieldFocused)
             Rectangle().fill(Ink.divider).frame(height: 1)
-            MarkupCanvas(image: coordinator.screenshot ?? Self.emptyCanvasImage, appearance: coordinator.appearance)
-                .padding(12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Ink.canvas)
-            if let statusMessage = coordinator.statusMessage {
+            ZStack {
+                MarkupCanvas(image: coordinator.screenshot ?? Self.emptyCanvasImage, appearance: coordinator.appearance)
+                if coordinator.isRecognizingText {
+                    TextAnalysisOverlay()
+                        .transition(.opacity)
+                        .zIndex(1)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Ink.canvas)
+            .animation(.easeInOut(duration: 0.22), value: coordinator.isRecognizingText)
+            if let statusMessage = coordinator.statusMessage, !coordinator.isRecognizingText {
                 HStack(spacing: 8) {
                     Image(systemName: statusMessage.hasPrefix("Unable") ? "exclamationmark.triangle" : "checkmark.circle")
                         .foregroundStyle(statusMessage.hasPrefix("Unable") ? Ink.warning : Ink.muted)
@@ -157,6 +165,22 @@ private struct EditorToolbar: View {
                 }
             }
 
+            if coordinator.markup.isCropping {
+                toolButton("checkmark", title: "Apply Crop", help: "Apply crop (Return)") {
+                    coordinator.markup.applyCrop()
+                }
+                .keyboardShortcut(.return, modifiers: [])
+                toolButton("xmark", title: "Cancel Crop", help: "Cancel crop (Escape)") {
+                    coordinator.markup.cancelCrop()
+                }
+                .keyboardShortcut(.cancelAction)
+            } else {
+                toolButton("crop", title: "Crop", help: "Crop the screenshot") {
+                    coordinator.markup.beginCrop()
+                }
+                .disabled(coordinator.screenshot == nil)
+            }
+
             toolbarDivider
 
             toolButton("arrow.uturn.backward", title: "Undo", help: "Undo (⌘Z)") { coordinator.markup.undo() }
@@ -241,6 +265,12 @@ private struct EditorToolbar: View {
             .keyboardShortcut("c", modifiers: .command)
             .disabled(coordinator.screenshot == nil)
 
+            toolButton("text.viewfinder", title: "Copy Text from Screenshot", help: "Copy recognized text (⇧⌘C)") {
+                coordinator.copyTextFromScreenshot()
+            }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(coordinator.screenshot == nil || coordinator.markup.isCropping || coordinator.isRecognizingText)
+
             toolButton("square.and.arrow.down", title: "Save screenshot", help: "Save screenshot (⌘S)") {
                 coordinator.saveScreenshot()
             }
@@ -249,7 +279,8 @@ private struct EditorToolbar: View {
 
             DragToSaveControl(dataProvider: {
                 guard let screenshot = coordinator.screenshot else { return nil }
-                return ScreenshotExport.pngData(from: screenshot, annotations: coordinator.markup.annotations, appearance: coordinator.appearance)
+                return ScreenshotExport.pngData(from: screenshot, annotations: coordinator.markup.annotations, appearance: coordinator.appearance,
+                                                 cropRect: coordinator.markup.cropRect)
             }, filename: ScreenshotExport.filename(for: coordinator.screenshotName))
             .opacity(coordinator.screenshot == nil ? 0.4 : 1)
         }

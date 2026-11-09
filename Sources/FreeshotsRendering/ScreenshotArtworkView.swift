@@ -7,6 +7,7 @@ import FreeshotsCore
 @MainActor
 public struct ScreenshotArtworkView: View {
     public let image: NSImage
+    public let cropRect: CGRect
     public let appearance: ScreenshotAppearance
     public let annotations: [ScreenshotMark]
     public let selectedID: UUID?
@@ -16,21 +17,24 @@ public struct ScreenshotArtworkView: View {
     @State private var windowColor: Color
 
     public init(image: NSImage, appearance: ScreenshotAppearance, annotations: [ScreenshotMark] = [],
+                cropRect: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1),
                 selectedID: UUID? = nil, draft: ScreenshotMark? = nil,
                 selectionColor: Color = .accentColor) {
         self.image = image
+        self.cropRect = cropRect
         self.appearance = appearance
         self.annotations = annotations
         self.selectedID = selectedID
         self.draft = draft
         self.selectionColor = selectionColor
-        let hex = ImageColorSampler.dominantColorHex(from: image)
+        let hex = ImageColorSampler.dominantColorHex(from: Self.croppedImage(image, cropRect: cropRect) ?? image)
         self._windowColor = State(initialValue: Color(nsColor: NSColor(hex: hex ?? "") ?? .windowBackgroundColor))
     }
 
     public var body: some View {
         GeometryReader { geometry in
-            let layout = fittedRects(image.size, in: geometry.size)
+            let displayImage = Self.croppedImage(image, cropRect: cropRect) ?? image
+            let layout = fittedRects(displayImage.size, in: geometry.size)
             ZStack(alignment: .topLeading) {
                 BackdropPreview(preset: appearance.backdrop)
                     .frame(width: layout.backdrop.width, height: layout.backdrop.height)
@@ -43,7 +47,7 @@ public struct ScreenshotArtworkView: View {
                                        shadowBlur: appearance.shadowBlur)
                         .position(x: layout.frame.midX, y: layout.frame.midY)
                 }
-                Image(nsImage: image)
+                Image(nsImage: displayImage)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: layout.image.width, height: layout.image.height)
@@ -52,20 +56,46 @@ public struct ScreenshotArtworkView: View {
                             radius: appearance.shadowBlur * layout.scale, y: appearance.shadowBlur * layout.scale * 0.35)
                     .position(x: layout.image.midX, y: layout.image.midY)
                 ForEach(annotations) { mark in
-                    markView(mark, in: layout.image, selected: mark.id == selectedID)
+                    markView(mark.transformed(to: cropRect), in: layout.image, selected: mark.id == selectedID,
+                             displayImage: displayImage)
                 }
-                if let draft { markView(draft, in: layout.image, selected: false) }
+                if let draft {
+                    markView(draft.transformed(to: cropRect), in: layout.image, selected: false,
+                             displayImage: displayImage)
+                }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
         }
         .onChange(of: ObjectIdentifier(image)) { _, _ in
-            let hex = ImageColorSampler.dominantColorHex(from: image)
+            let hex = ImageColorSampler.dominantColorHex(from: Self.croppedImage(image, cropRect: cropRect) ?? image)
+            windowColor = Color(nsColor: NSColor(hex: hex ?? "") ?? .windowBackgroundColor)
+        }
+        .onChange(of: cropRect) { _, newCrop in
+            let hex = ImageColorSampler.dominantColorHex(from: Self.croppedImage(image, cropRect: newCrop) ?? image)
             windowColor = Color(nsColor: NSColor(hex: hex ?? "") ?? .windowBackgroundColor)
         }
     }
 
     public static func imageRect(imageSize: CGSize, in size: CGSize, appearance: ScreenshotAppearance) -> CGRect {
         fittedRects(imageSize, in: size, appearance: appearance).image
+    }
+
+    public static func croppedSize(_ imageSize: CGSize, cropRect: CGRect) -> CGSize {
+        CGSize(width: imageSize.width * cropRect.width, height: imageSize.height * cropRect.height)
+    }
+
+    public static func croppedImage(_ image: NSImage, cropRect: CGRect) -> NSImage? {
+        guard cropRect != CGRect(x: 0, y: 0, width: 1, height: 1),
+              cropRect.width > 0, cropRect.height > 0 else { return image }
+        var proposed = CGRect(origin: .zero, size: image.size)
+        guard let source = image.cgImage(forProposedRect: &proposed, context: nil, hints: nil) else { return nil }
+        let pixelRect = CGRect(x: cropRect.minX * CGFloat(source.width),
+                               y: cropRect.minY * CGFloat(source.height),
+                               width: cropRect.width * CGFloat(source.width),
+                               height: cropRect.height * CGFloat(source.height)).integral
+        guard let cropped = source.cropping(to: pixelRect.intersection(CGRect(x: 0, y: 0, width: source.width, height: source.height))) else { return nil }
+        return NSImage(cgImage: cropped, size: croppedSize(image.size, cropRect: cropRect))
     }
 
     private var screenshotCornerRadius: CGFloat {
@@ -104,7 +134,7 @@ public struct ScreenshotArtworkView: View {
     }
 
     @ViewBuilder
-    private func markView(_ mark: ScreenshotMark, in rect: CGRect, selected: Bool) -> some View {
+    private func markView(_ mark: ScreenshotMark, in rect: CGRect, selected: Bool, displayImage: NSImage) -> some View {
         let start = canvasPoint(mark.start, in: rect)
         let end = canvasPoint(mark.end, in: rect)
         let bounds = CGRect(x: min(start.x, end.x), y: min(start.y, end.y),
@@ -120,7 +150,7 @@ public struct ScreenshotArtworkView: View {
                 Rectangle().fill(markColor(mark.colorHex)).frame(width: max(12, bounds.width), height: max(12, bounds.height))
                     .position(x: bounds.midX, y: bounds.midY)
             case .blur:
-                if let pixelatedImage = Self.pixelated(image) {
+                if let pixelatedImage = Self.pixelated(displayImage) {
                     Image(nsImage: pixelatedImage)
                         .resizable().interpolation(.none)
                         .frame(width: rect.width, height: rect.height)
@@ -173,6 +203,19 @@ public struct ScreenshotArtworkView: View {
         guard let output = filter.outputImage?.cropped(to: source.extent),
               let result = CIContext().createCGImage(output, from: source.extent) else { return nil }
         return NSImage(cgImage: result, size: image.size)
+    }
+}
+
+private extension ScreenshotMark {
+    func transformed(to crop: CGRect) -> ScreenshotMark {
+        func map(_ point: CGPoint) -> CGPoint {
+            CGPoint(x: (point.x - crop.minX) / crop.width, y: (point.y - crop.minY) / crop.height)
+        }
+        var copy = self
+        copy.start = map(start)
+        copy.end = map(end)
+        copy.points = points.map(map)
+        return copy
     }
 }
 

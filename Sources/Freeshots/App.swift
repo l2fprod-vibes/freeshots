@@ -2,6 +2,7 @@ import AppKit
 import Observation
 import SwiftUI
 import UniformTypeIdentifiers
+import Vision
 import FreeshotsCore
 import FreeshotsRendering
 
@@ -42,6 +43,7 @@ final class CaptureCoordinator {
     var captureError: String?
     var screenRecordingPermissionMissing = false
     var statusMessage: String?
+    private(set) var isRecognizingText = false
     var appearance = ScreenshotAppearance.defaults {
         didSet {
             if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] != "1" { persistAppearance() }
@@ -55,7 +57,13 @@ final class CaptureCoordinator {
 
     var markup = MarkupDocument()
     private var savedAnnotations: [ScreenshotMark]?
+    private var savedCropRect: CGRect?
     private var editorPanel: NSPanel?
+
+    private var hasUnsavedMarkup: Bool {
+        (!markup.annotations.isEmpty && markup.annotations != savedAnnotations)
+            || markup.cropRect != (savedCropRect ?? CGRect(x: 0, y: 0, width: 1, height: 1))
+    }
 
     private init() {
         UserDefaults.standard.removeObject(forKey: "lastScreenshot")
@@ -132,6 +140,8 @@ final class CaptureCoordinator {
         editorPanel?.title = screenshotName
         requestedMode = nil
         markup.reset()
+        savedAnnotations = nil
+        savedCropRect = markup.cropRect
         statusMessage = nil
         showFloatingEditor()
     }
@@ -154,6 +164,7 @@ final class CaptureCoordinator {
             self.statusMessage = nil
             self.savedAnnotations = nil
             self.markup.reset()
+            self.savedCropRect = self.markup.cropRect
             self.showFloatingEditor()
         }
         if let editorPanel, editorPanel.isVisible {
@@ -183,6 +194,7 @@ final class CaptureCoordinator {
         statusMessage = nil
         savedAnnotations = nil
         markup.reset()
+        savedCropRect = markup.cropRect
         showFloatingEditor()
     }
 
@@ -199,13 +211,13 @@ final class CaptureCoordinator {
         }.joined(separator: "\n")
         try? report.write(to: url.appendingPathExtension("controls.txt"), atomically: true, encoding: .utf8)
         if let screenshot,
-           let export = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) {
+           let export = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance, cropRect: markup.cropRect) {
             try? export.write(to: url.appendingPathExtension("rendered.png"), options: .atomic)
         }
     }
 
     func capture(_ mode: CaptureMode, timed: Bool = false, completion: @escaping @MainActor () -> Void) {
-        if !markup.annotations.isEmpty, markup.annotations != savedAnnotations, !confirmClose() { return }
+        if hasUnsavedMarkup, !confirmClose() { return }
         let previousMode = requestedMode
         let wasEditorVisible = editorPanel?.isVisible == true
         let pointerLocation = NSEvent.mouseLocation
@@ -263,6 +275,7 @@ final class CaptureCoordinator {
                 statusMessage = couldNotRememberScreenshot ? "Unable to remember the last screenshot." : nil
                 savedAnnotations = nil
                 markup.reset()
+                savedCropRect = markup.cropRect
                 markup.activeArrowStyle = .solid
                 markup.activeTool = .arrow
                 completion()
@@ -291,7 +304,7 @@ final class CaptureCoordinator {
     }
 
     func copyScreenshot() {
-        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) else {
+        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance, cropRect: markup.cropRect) else {
             statusMessage = "Unable to copy screenshot. Try again."
             return
         }
@@ -305,8 +318,43 @@ final class CaptureCoordinator {
         }
     }
 
+    func copyTextFromScreenshot() {
+        guard let screenshot, !isRecognizingText else { return }
+        let privacyMarks = markup.annotations.filter { $0.tool == .redact || $0.tool == .blur }
+        let plainAppearance = ScreenshotAppearance(backdrop: .transparent, padding: 0, cornerRadius: 0,
+                                                   backdropCornerRadius: 0, shadowEnabled: false,
+                                                   shadowBlur: 0, shadowOpacity: 0, frame: .none,
+                                                   aspectRatio: .original)
+        guard let imageData = ScreenshotExport.pngData(from: screenshot, annotations: privacyMarks,
+                                                       appearance: plainAppearance, cropRect: markup.cropRect) else {
+            statusMessage = "Unable to recognize text. Try again."
+            return
+        }
+        isRecognizingText = true
+        statusMessage = "Analyzing screenshot…"
+        Task {
+            defer { isRecognizingText = false }
+            do {
+                let recognizedText = try await VisionTextRecognizer.recognize(imageData)
+                guard !recognizedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    statusMessage = "No text found in this screenshot."
+                    return
+                }
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                if pasteboard.setString(recognizedText, forType: .string) {
+                    statusMessage = nil
+                } else {
+                    statusMessage = "Unable to recognize text. Try again."
+                }
+            } catch {
+                statusMessage = "Unable to recognize text. Try again."
+            }
+        }
+    }
+
     func saveScreenshot() {
-        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance) else {
+        guard let screenshot, let data = ScreenshotExport.pngData(from: screenshot, annotations: markup.annotations, appearance: appearance, cropRect: markup.cropRect) else {
             statusMessage = "Unable to save screenshot. Try again."
             return
         }
@@ -321,6 +369,7 @@ final class CaptureCoordinator {
                 self?.screenshotName = destination.deletingPathExtension().lastPathComponent
                 self?.editorPanel?.title = self?.screenshotName ?? destination.lastPathComponent
                 self?.savedAnnotations = self?.markup.annotations
+                self?.savedCropRect = self?.markup.cropRect
                 self?.statusMessage = "Saved"
                 if UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true {
                     UserDefaults.standard.set(self?.screenshotName, forKey: "lastScreenshotName")
@@ -343,11 +392,11 @@ final class CaptureCoordinator {
     }
 
     private func confirmClose() -> Bool {
-        guard !markup.annotations.isEmpty, markup.annotations != savedAnnotations else { return true }
+        guard hasUnsavedMarkup else { return true }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Discard your markup?"
-        alert.informativeText = "Your unsaved markup will be lost."
+        alert.messageText = "Discard your edits?"
+        alert.informativeText = "Your crop and markup changes will be lost."
         alert.addButton(withTitle: "Discard Changes")
         alert.addButton(withTitle: "Keep Editing")
         return alert.runModal() == .alertFirstButtonReturn
@@ -397,8 +446,9 @@ enum ScreenshotExport {
         return title ?? appName.flatMap { $0.isEmpty ? nil : $0 } ?? defaultName
     }
 
-    static func pngData(from image: NSImage, annotations: [ScreenshotMark] = [], appearance: ScreenshotAppearance = .defaults) -> Data? {
-        ScreenshotRenderer.pngData(image: image, annotations: annotations, appearance: appearance)
+    static func pngData(from image: NSImage, annotations: [ScreenshotMark] = [], appearance: ScreenshotAppearance = .defaults,
+                        cropRect: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)) -> Data? {
+        ScreenshotRenderer.pngData(image: image, annotations: annotations, appearance: appearance, cropRect: cropRect)
     }
 }
 
@@ -474,6 +524,8 @@ private struct CaptureMenu: View {
 
     @ViewBuilder
     private var menuContent: some View {
+        Button("About Freeshots") { (NSApp.delegate as? AppDelegate)?.showAboutFreeshots(nil) }
+        Divider()
         Button("Open Image…") { coordinator.openImage() }
             .keyboardShortcut("o", modifiers: .command)
         Button("Open from Clipboard") { coordinator.openImageFromClipboard() }
@@ -487,6 +539,9 @@ private struct CaptureMenu: View {
         Button("Capture Area in 5 Seconds") { open(.area, timed: true) }
         Button("Capture Window in 5 Seconds") { open(.window, timed: true) }
         Button("Capture Display in 5 Seconds") { open(.display, timed: true) }
+        Button("Copy Text from Screenshot") { coordinator.copyTextFromScreenshot() }
+            .keyboardShortcut("c", modifiers: [.command, .shift])
+            .disabled(coordinator.screenshot == nil)
         if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), coordinator.hasRememberedScreenshot {
             Button("Show Last Screenshot") { coordinator.showLastScreenshot() }
         }
@@ -506,6 +561,8 @@ private struct CaptureMenu: View {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var permissionWindow: NSWindow?
+    private var aboutWindow: NSWindow?
+    private var aboutPreviousActivationPolicy: NSApplication.ActivationPolicy?
     private var applicationMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -595,7 +652,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenuItem = mainMenu.items.first(where: { $0.title == "Freeshots" })
             ?? NSMenuItem(title: "Freeshots", action: nil, keyEquivalent: "")
         let appMenu = NSMenu(title: "Freeshots")
-        appMenu.addItem(NSMenuItem(title: "About Freeshots", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        let aboutItem = NSMenuItem(title: "About Freeshots", action: #selector(showAboutFreeshots(_:)), keyEquivalent: "")
+        aboutItem.target = self
+        appMenu.addItem(aboutItem)
         appMenu.addItem(.separator())
         appMenu.addItem(NSMenuItem(title: "Hide Freeshots", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
         appMenu.addItem(NSMenuItem(title: "Quit Freeshots", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -608,9 +667,59 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         applicationMenuItem = appMenuItem
     }
 
+    @objc func showAboutFreeshots(_ sender: Any?) {
+        if let aboutWindow {
+            aboutWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        aboutPreviousActivationPolicy = NSApp.activationPolicy()
+        NSApp.unhide(nil)
+        NSApp.setActivationPolicy(.regular)
+        showApplicationMenu()
+        NSApp.activate(ignoringOtherApps: true)
+        let window = AboutFreeshotsWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 470),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "About Freeshots"
+        window.isReleasedWhenClosed = false
+        window.delegate = window
+        window.didClose = { [weak self] in
+            guard let self else { return }
+            self.aboutWindow = nil
+            if self.aboutPreviousActivationPolicy == .accessory {
+                self.aboutPreviousActivationPolicy = nil
+                NSApp.setActivationPolicy(.accessory)
+                self.hideApplicationMenu()
+                NSApp.hide(nil)
+            }
+        }
+        window.contentMinSize = NSSize(width: 420, height: 470)
+        window.contentMaxSize = NSSize(width: 420, height: 470)
+        let host = NSHostingView(rootView: AboutFreeshotsView())
+        host.sizingOptions = []
+        window.contentView = host
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        aboutWindow = window
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
     func hideApplicationMenu() {
         applicationMenuItem?.isHidden = true
     }
+}
+
+@MainActor
+private final class AboutFreeshotsWindow: NSWindow, NSWindowDelegate {
+    var didClose: (() -> Void)?
+
+    override func cancelOperation(_ sender: Any?) { close() }
+
+    func windowWillClose(_ notification: Notification) { didClose?() }
 }
 
 private struct PermissionOnboardingView: View {
