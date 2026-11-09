@@ -23,11 +23,18 @@ enum KitMetric {
     static let panelRadius: CGFloat = 18
     static let editorWidth: CGFloat = 1120
     static let editorHeight: CGFloat = 720
+    static let countdownNumberSize: CGFloat = 112
+    static let countdownDialSize: CGFloat = 160
+    static let countdownRingWidth: CGFloat = 7
+    static let countdownTrackWidth: CGFloat = 5
+    static let countdownOverlayWidth: CGFloat = 280
+    static let countdownOverlayHeight: CGFloat = 280
 }
 
 enum KitMotion {
     static let hover = Animation.easeOut(duration: 0.12)
     static let press = Animation.spring(response: 0.20, dampingFraction: 0.78)
+    static let countdownRevolution: TimeInterval = 1
 }
 
 enum KitType {

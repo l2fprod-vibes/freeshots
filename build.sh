@@ -4,7 +4,17 @@ set -euo pipefail
 here=${0:A:h}
 name="Freeshots"
 config=release
-[[ " $* " == *" --debug "* ]] && config=debug
+install_app=0
+for argument in "$@"; do
+  case "$argument" in
+    --debug) config=debug ;;
+    --install) install_app=1 ;;
+    *)
+      print -u2 "Usage: ./build.sh [--debug] [--install]"
+      exit 2
+      ;;
+  esac
+done
 scratch="${TMPDIR:-/tmp}/Freeshots-build"
 version="${APP_VERSION:-0.1}"
 build_number="${APP_BUILD:-$(date +%Y%m%d%H%M)}"
@@ -51,3 +61,29 @@ fi
 
 codesign --force --sign "$identity" --options runtime --timestamp "$app"
 echo "built $app"
+
+if [[ "$install_app" == "1" ]]; then
+  install_target="/Applications/$name.app"
+  install_stage="/Applications/.$name.installing.$$"
+  install_backup="/Applications/.$name.previous.$$"
+
+  ditto "$app" "$install_stage"
+  codesign --verify --deep --strict "$install_stage"
+
+  if [[ -e "$install_target" ]]; then
+    mv "$install_target" "$install_backup"
+  fi
+  if ! mv "$install_stage" "$install_target"; then
+    if [[ -e "$install_backup" ]]; then
+      mv "$install_backup" "$install_target"
+    fi
+    print -u2 "Unable to install $install_target; the previous app was restored."
+    exit 1
+  fi
+
+  if [[ -e "$install_backup" ]]; then
+    rm -rf "$install_backup"
+  fi
+  codesign --verify --deep --strict "$install_target"
+  echo "installed $install_target"
+fi

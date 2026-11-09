@@ -13,7 +13,9 @@ Use only BAMA skills for work in this repository. Do not invoke workflows from S
 
 ## Build
 
-Run `./build.sh`. The script builds a local `.app` bundle in `build/` and does not install or open it.
+Run `./build.sh` to build a local `.app` bundle in `build/`.
+Run `./build.sh --install` to replace `/Applications/Freeshots.app` with the signed build. This requires permission to write to `/Applications`.
+Combine `--debug` and `--install` to install a debug build.
 
 ## Icon
 

@@ -204,19 +204,46 @@ final class CaptureCoordinator {
         }
     }
 
-    func capture(_ mode: CaptureMode, completion: @escaping @MainActor () -> Void) {
+    func capture(_ mode: CaptureMode, timed: Bool = false, completion: @escaping @MainActor () -> Void) {
         if !markup.annotations.isEmpty, markup.annotations != savedAnnotations, !confirmClose() { return }
         let previousMode = requestedMode
         let wasEditorVisible = editorPanel?.isVisible == true
+        let pointerLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first { $0.frame.contains(pointerLocation) } ?? NSScreen.main ?? NSScreen.screens.first
         editorPanel?.orderOut(nil)
         requestedMode = mode
         captureError = nil
         screenRecordingPermissionMissing = false
         statusMessage = nil
+        let selectionCountdown: (@MainActor () async -> Bool)?
+        if timed && mode != .display {
+            selectionCountdown = {
+                let location = NSEvent.mouseLocation
+                let selectionScreen = NSScreen.screens.first { $0.frame.contains(location) }
+                    ?? targetScreen
+                guard let selectionScreen else { return false }
+                return await CaptureCountdownOverlay.shared.run(on: selectionScreen)
+            }
+        } else {
+            selectionCountdown = nil
+        }
         Task {
             do {
+                if timed, mode == .display, let targetScreen {
+                    guard await CaptureCountdownOverlay.shared.run(on: targetScreen) else {
+                        requestedMode = previousMode
+                        if wasEditorVisible { showFloatingEditor() }
+                        return
+                    }
+                }
                 let includeWindowShadow = UserDefaults.standard.bool(forKey: "includeWindowShadow")
-                guard let image = try await ScreenCaptureService.shared.capture(mode, includeWindowShadow: includeWindowShadow) else {
+                guard let image = try await ScreenCaptureService.shared.capture(
+                    mode,
+                    includeWindowShadow: includeWindowShadow,
+                    targetScreen: timed ? targetScreen : nil,
+                    delaySeconds: timed ? 5 : 0,
+                    onInteractiveSelection: selectionCountdown
+                ) else {
                     requestedMode = previousMode
                     if wasEditorVisible { showFloatingEditor() }
                     return
@@ -456,6 +483,10 @@ private struct CaptureMenu: View {
         Button("Capture Area") { open(.area) }
         Button("Capture Window") { open(.window) }
         Button("Capture Display") { open(.display) }
+        Divider()
+        Button("Capture Area in 5 Seconds") { open(.area, timed: true) }
+        Button("Capture Window in 5 Seconds") { open(.window, timed: true) }
+        Button("Capture Display in 5 Seconds") { open(.display, timed: true) }
         if (UserDefaults.standard.object(forKey: "rememberLastScreenshot") as? Bool ?? true), coordinator.hasRememberedScreenshot {
             Button("Show Last Screenshot") { coordinator.showLastScreenshot() }
         }
@@ -467,8 +498,8 @@ private struct CaptureMenu: View {
             .keyboardShortcut("q", modifiers: .command)
     }
 
-    private func open(_ mode: CaptureMode) {
-        coordinator.capture(mode) { coordinator.showFloatingEditor() }
+    private func open(_ mode: CaptureMode, timed: Bool = false) {
+        coordinator.capture(mode, timed: timed) { coordinator.showFloatingEditor() }
     }
 }
 
@@ -479,10 +510,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        let previewCountdown = ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_COUNTDOWN"] == "1"
         if ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] != "1",
+           !previewCountdown,
            !CGPreflightScreenCaptureAccess(),
            !UserDefaults.standard.bool(forKey: "permissionOnboardingSkipped") {
             showPermissionOnboarding()
+        }
+        if previewCountdown {
+            NSApp.setActivationPolicy(.regular)
+            let previewAppearance: NSAppearance.Name = ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_DARK"] == "1"
+                ? .darkAqua
+                : .aqua
+            NSApp.appearance = NSAppearance(named: previewAppearance)
+            if let screen = NSScreen.main ?? NSScreen.screens.first {
+                CaptureCountdownOverlay.shared.showPreview(on: screen)
+            }
+            return
         }
         guard ProcessInfo.processInfo.environment["FREESHOTS_PREVIEW_EDITOR"] == "1" else { return }
         let image = NSImage(size: NSSize(width: 1200, height: 760))

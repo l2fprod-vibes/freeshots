@@ -377,16 +377,119 @@ UX:
 - Words: “Open from Clipboard”, “No image found on the clipboard. Copy an image and try again.”
 - Access: keyboard and VoiceOver use the menu label; Command-Shift-O is shown in the menu.
 
-Status: todo — implementation builds; pending UI and clipboard interaction review because no Apple Development signing identity is available for the snapshot install.
+Status: todo — implementation builds; clipboard interaction review is pending because you asked me not to run tests.
+
+## M2 — Screenshot control and finishing
+
+These stories extend the local screenshot workflow. The countdown is fixed at five seconds for the first version; the crop applies to captured screenshot pixels, not the styled canvas or its padding and frame.
+
+### S-018 Capture after a five-second countdown
+
+As the user, I start an area, window, or display capture with enough time to prepare the screen, and see a large countdown before the screenshot is taken.
+
+Screens: 11-timed-capture.png
+
+Depends: S-003
+
+Acceptance:
+- [manual] I can start a timed Area, Window, or Display capture from the menu bar.
+- [manual] For Area and Window capture, the matching selection flow starts first; the five-second delay begins after I select the area or window.
+- [manual] For Display capture, the display under the pointer when I choose the command is captured after a large, visible five-second countdown.
+- [manual] The Freeshots countdown overlay is absent from the resulting screenshot.
+- [manual] Escape cancels an active selection or countdown and returns to the desktop without opening the editor.
+- [snap] The Freeshots display countdown is visually prominent, has sufficient contrast in Light and Dark appearances, and does not obscure the whole target.
+
+UX:
+- Flow: menu bar -> Capture Area/Window in 5 Seconds -> select an area or window -> native five-second delay -> capture opens in the Floating Editor; Capture Display in 5 Seconds -> large visible countdown -> capture opens in the Floating Editor; Escape cancels selection or countdown.
+- Surface: macOS interactive selection for Area and Window, followed by a transparent screen-level Freeshots countdown overlay while the native delayed capture waits; Display uses the same overlay before capture.
+- States: area/window selection begins immediately, then countdown shows 5, 4, 3, 2, 1; Display countdown shows 5, 4, 3, 2, 1; Escape cancels; capture errors use existing capture guidance; the Freeshots overlay is absent from the result.
+- Words: “Capture Area in 5 Seconds”, “Capture Window in 5 Seconds”, “Capture Display in 5 Seconds”; accessible countdown announcement “Screenshot in 5 seconds”.
+- Access: Escape cancels; VoiceOver announces the countdown without announcing every rapid visual transition; the countdown is readable without relying on color.
+
+Status: todo — build succeeds and the Light/Dark countdown snapshots are reviewed; Area/Window selection, timer synchronization, and cancel interaction remain unverified because you asked me not to run tests.
+
+### S-019 Crop the screenshot
+
+As the user, I crop the captured screenshot to keep only the pixels I need, independently of its backdrop, padding, aspect ratio, or device frame.
+
+Screens: 12-crop-tool.png
+
+Depends: S-004
+
+Acceptance:
+- [manual] Crop lets me adjust a rectangular crop boundary over the source screenshot and apply or cancel it.
+- [manual] Applying Crop changes the screenshot bounds used by markup, preview, Copy, Save, and Drag to Save; it does not crop or resize the surrounding backdrop, padding, or device frame.
+- [manual] Undo restores the previous crop and screenshot bounds.
+- [manual] Existing markup remains editable; marks outside the crop are excluded from the visible result and return if the crop is undone or expanded.
+- [manual] Crop operates on the screenshot image before appearance styling and never resamples pixels unless required by export.
+- [snap] Crop boundaries, handles, and the area outside the crop are distinguishable in Light and Dark appearances.
+
+UX:
+- Flow: Floating Editor -> Crop -> adjust rectangular bounds -> Apply or Escape to cancel -> continue markup or export; Command-Z undoes an applied crop.
+- Surface: canvas tool, because the user adjusts the crop while watching the screenshot itself.
+- States: crop bounds are visible; Apply commits one undoable change; Escape cancels the current adjustment; no crop is applied until confirmed.
+- Words: “Crop”, “Apply Crop”, “Cancel Crop”.
+- Access: crop bounds can be moved and resized with the keyboard; VoiceOver announces the crop bounds and Apply/Cancel actions; handles have visible focus.
+
+Status: todo
+
+### S-020 Copy text from a screenshot
+
+As the user, I copy readable text from the current screenshot to the clipboard without sending the image off the Mac.
+
+Screens: 13-copy-text.png
+
+Depends: S-004
+
+Acceptance:
+- [manual] Copy Text from Screenshot recognizes text on-device and writes plain text to the clipboard.
+- [manual] Recognition uses the current screenshot crop after Redact and Blur marks are applied; added markup labels, backdrops, and device frames are excluded.
+- [manual] Recognized lines are returned in a predictable reading order with line breaks preserved where detected.
+- [manual] The editor remains open after copying; success is quiet.
+- [manual] When no text is recognized, the screenshot and existing clipboard contents remain unchanged and the editor explains that no text was found.
+- [manual] Recognition works offline and makes no network request.
+- [manual] Recognition failure leaves the screenshot and clipboard unchanged and offers a retry.
+
+UX:
+- Flow: Floating Editor -> Copy Text from Screenshot -> recognized plain text replaces clipboard contents; if no text is found, an inline message explains the result and the screenshot stays open.
+- Surface: menu command and toolbar action, because both are direct ways to perform one action on the current screenshot.
+- States: working state only if recognition takes longer than half a second; success is quiet; no-text and failure messages are inline and leave the clipboard unchanged.
+- Words: “Copy Text from Screenshot”, “No text found in this screenshot.”, “Unable to recognize text. Try again.”
+- Access: toolbar action has a tooltip, keyboard command, and VoiceOver label; progress and result messages are announced accessibly.
+
+Status: todo
+
+### S-021 Show About Freeshots
+
+As the user, I open About Freeshots to see the app identity, version, and the AI Badge used by the project.
+
+Screens: 14-about-freeshots.png
+
+Acceptance:
+- [snap] About Freeshots shows the app name, app icon, version, and the AI Badge image.
+- [manual] The badge image is bundled with the app and displayed without a network request.
+- [manual] The About view credits AI Badge and its CC0 1.0 license and identifies aibadge.org as the source.
+- [manual] About Freeshots is available from the Freeshots app menu and the menu bar menu.
+- [manual] About opens as a small, focused window that can be closed with Escape or the standard close button.
+
+UX:
+- Flow: Freeshots app menu or menu bar menu -> About Freeshots -> review app details and badge -> close the window.
+- Surface: small About window, the standard place for stable app identity and version details.
+- States: version and bundled badge appear immediately; no loading or network-dependent state.
+- Words: “About Freeshots”, “AI Badge”, “CC0 1.0”.
+- Access: VoiceOver announces the app name, version, badge description, and attribution; the close button follows standard macOS behavior.
+
+Status: todo
 
 ## Later
 
 - **V2:** Record a display, window, or area as a local video; preview and save or drag the clip. Audio, camera, and video editing scope remain undecided.
+- Consider screenshot history, scrolling screenshots, pinning, and capture guides only after the capture, crop, and text-copy flows are complete.
 
 ## Dropped
 
 - Cloud uploads, share links, accounts, sync, analytics, and telemetry.
-- Screenshot history/library, search, OCR, scrolling capture, and multi-image composition.
+- Search, scrolling capture, and multi-image composition.
 
 ### S-014 Check Screen Recording access on first launch
 

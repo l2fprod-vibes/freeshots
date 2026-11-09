@@ -8,6 +8,7 @@
 | Capture Window | Select one visible app window for a screenshot | window grab |
 | Include Window Shadow | Add the system shadow to a window capture | window shadow |
 | Capture Display | Capture one selected display | full screen grab |
+| Timed Capture | Capture after a visible five-second countdown | delayed capture |
 | Open Image | Open a local image in the Floating Editor | import screenshot |
 | Open from Clipboard | Open a copied image in the Floating Editor | paste image |
 | Screen Recording Permission | macOS access required to capture the screen | recording permission |
@@ -32,6 +33,10 @@
 | Backdrop | Background, padding, corners, and shadow around a screenshot | template |
 | Device Frame | Window, Mac, or phone frame around a screenshot | mockup |
 | Aspect Ratio | Overall canvas shape, expanded around the screenshot without cropping it | crop |
+| Crop | The rectangular part of the screenshot pixels retained for editing and export | aspect ratio |
+| Copy Text from Screenshot | Recognize visible text in the current screenshot and copy it as plain text | OCR |
+| About Freeshots | The window with Freeshots identity, version, and attribution | about box |
+| AI Badge | The locally bundled “Made with AI” badge from aibadge.org | AI watermark |
 | Custom Color | A color selected with the macOS color picker | custom ink |
 | Padding | Clear or colored inset around a screenshot | margin |
 | Screenshot Corners | Screenshot edge radius | screenshot rounding |
