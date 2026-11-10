@@ -19,7 +19,7 @@ Skitch for screenshot markup and the built-in capture flow for everyday screensh
 - Capture: screenshot image, timestamp, capture dimensions, and local file URL when saved.
 - Markup: editable text, arrow, shape, freehand, and redaction objects attached to an image capture.
 - Preferences: configurable capture shortcuts, local save defaults, optional launch at login, and System/Light/Dark interface appearance.
-- About: app version and a locally bundled AI Badge image with source and license attribution.
+- About: app name, version, and a locally bundled AI Badge image.
 
 ## Shape
 

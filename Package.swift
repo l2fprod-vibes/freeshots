@@ -10,6 +10,7 @@ let package = Package(
         .executableTarget(
             name: "Freeshots",
             dependencies: ["FreeshotsCore", "FreeshotsRendering"],
+            resources: [.copy("Resources/made-with-ai-blue-green.png")],
             swiftSettings: [.defaultIsolation(MainActor.self)]
         ),
         .testTarget(name: "FreeshotsCoreTests", dependencies: ["FreeshotsCore", "FreeshotsRendering"]),

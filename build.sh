@@ -16,7 +16,7 @@ for argument in "$@"; do
   esac
 done
 scratch="${TMPDIR:-/tmp}/Freeshots-build"
-version="${APP_VERSION:-0.1}"
+version="${APP_VERSION:-0.0.1}"
 build_number="${APP_BUILD:-$(date +%Y%m%d%H%M)}"
 bundle_id="${APP_BUNDLE_ID:-com.l2fprod.freeshots}"
 identity="${CODESIGN_IDENTITY:-}"
@@ -60,6 +60,10 @@ if [[ -f "$here/Resources/AppIcon.icns" ]]; then
 fi
 if [[ -f "$here/Resources/made-with-ai-blue-green.png" ]]; then
   cp "$here/Resources/made-with-ai-blue-green.png" "$app/Contents/Resources/"
+fi
+resource_bundle=$(find "$scratch" -type d -name "${name}_${name}.bundle" -print -quit)
+if [[ -n "$resource_bundle" ]]; then
+  ditto "$resource_bundle" "$app/Contents/Resources/$(basename "$resource_bundle")"
 fi
 
 codesign --force --sign "$identity" --options runtime --timestamp "$app"

@@ -466,20 +466,21 @@ As the user, I open About Freeshots to see the app identity, version, and the AI
 Screens: 14-about-freeshots.png
 
 Acceptance:
-- [snap] About Freeshots shows the app name, app icon, version, and the AI Badge image.
+- [snap] About Freeshots shows the app name, version, and AI Badge image over an animated gradient.
+- [manual] The background glow follows pointer movement with subtle parallax and settles when the pointer leaves.
 - [manual] The badge image is bundled with the app and displayed without a network request.
-- [manual] The About view credits AI Badge and its CC0 1.0 license and identifies aibadge.org as the source.
+- [manual] The bundled badge is displayed without visible source or license text.
 - [manual] About Freeshots is available from the Freeshots app menu and the menu bar menu.
 - [manual] About opens as a small, focused window that can be closed with Escape or the standard close button.
 
 UX:
 - Flow: Freeshots app menu or menu bar menu -> About Freeshots -> review app details and badge -> close the window.
 - Surface: small About window, the standard place for stable app identity and version details.
-- States: version and bundled badge appear immediately; no loading or network-dependent state.
-- Words: “About Freeshots”, “AI Badge”, “CC0 1.0”.
-- Access: VoiceOver announces the app name, version, badge description, and attribution; the close button follows standard macOS behavior.
+- States: app name, version, and bundled badge appear immediately; the gradient animates and reacts to pointer movement unless Reduce Motion is enabled; no loading or network-dependent state.
+- Words: “Freeshots”, “Version”; the badge has a VoiceOver description without a visible caption.
+- Access: VoiceOver announces the app name, version, and badge description; the close button follows standard macOS behavior.
 
-Status: done — the local badge is bundled into the app and the About view is wired to both menus; build succeeds; no automated tests were run per request.
+Status: updated — the About window uses an animated, pointer-reactive gradient, shows the app name, version, and badge, and honors Reduce Motion. No source or license credit is displayed.
 
 ## Later
 

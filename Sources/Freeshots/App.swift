@@ -14,7 +14,7 @@ struct FreeshotsApp: App {
 
     var body: some Scene {
         MenuBarExtra("Freeshots", systemImage: "viewfinder") {
-            CaptureMenu()
+            CaptureMenu(delegate: delegate)
                 .environment(coordinator)
                 .environment(hotkeys)
                 .themed()
@@ -29,6 +29,19 @@ struct FreeshotsApp: App {
                 .themed()
         }
         .windowResizability(.contentSize)
+
+        Window("About Freeshots", id: "about") {
+            AboutFreeshotsView()
+                .frame(width: 420, height: 470)
+                .onDisappear { delegate.aboutWindowDidClose() }
+        }
+        .defaultSize(width: 420, height: 470)
+        .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About Freeshots") { delegate.showAboutFreeshots(nil) }
+            }
+        }
     }
 }
 
@@ -86,7 +99,7 @@ final class CaptureCoordinator {
     func showFloatingEditor() {
         NSApp.unhide(nil)
         NSApp.setActivationPolicy(.regular)
-        (NSApp.delegate as? AppDelegate)?.showApplicationMenu()
+        AppDelegate.shared?.showApplicationMenu()
         NSApp.activate(ignoringOtherApps: true)
         if let editorPanel {
             editorPanel.orderFrontRegardless()
@@ -124,7 +137,7 @@ final class CaptureCoordinator {
     private func editorDidClose(_ panel: FloatingEditorPanel) {
         DispatchQueue.main.async {
             NSApp.setActivationPolicy(.accessory)
-            (NSApp.delegate as? AppDelegate)?.hideApplicationMenu()
+            AppDelegate.shared?.hideApplicationMenu()
             NSApp.hide(nil)
         }
     }
@@ -172,7 +185,7 @@ final class CaptureCoordinator {
         } else {
             NSApp.unhide(nil)
             NSApp.setActivationPolicy(.regular)
-            (NSApp.delegate as? AppDelegate)?.showApplicationMenu()
+            AppDelegate.shared?.showApplicationMenu()
             NSApp.activate(ignoringOtherApps: true)
             panel.begin(completionHandler: completion)
         }
@@ -514,17 +527,22 @@ enum CaptureMode: CaseIterable, Identifiable {
 }
 
 private struct CaptureMenu: View {
+    let delegate: AppDelegate
     @Environment(CaptureCoordinator.self) private var coordinator
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         menuContent
-            .onAppear { coordinator.refreshClipboardAvailability() }
+            .onAppear {
+                coordinator.refreshClipboardAvailability()
+                delegate.setAboutWindowOpener { openWindow(id: "about") }
+            }
     }
 
     @ViewBuilder
     private var menuContent: some View {
-        Button("About Freeshots") { (NSApp.delegate as? AppDelegate)?.showAboutFreeshots(nil) }
+        Button("About Freeshots") { delegate.showAboutFreeshots(nil) }
         Divider()
         Button("Open Image…") { coordinator.openImage() }
             .keyboardShortcut("o", modifiers: .command)
@@ -560,10 +578,18 @@ private struct CaptureMenu: View {
 
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+    static private(set) var shared: AppDelegate?
+
     private var permissionWindow: NSWindow?
     private var aboutWindow: NSWindow?
+    private var aboutWindowOpener: (() -> Void)?
     private var aboutPreviousActivationPolicy: NSApplication.ActivationPolicy?
     private var applicationMenuItem: NSMenuItem?
+
+    override init() {
+        super.init()
+        Self.shared = self
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -668,16 +694,47 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showAboutFreeshots(_ sender: Any?) {
+        prepareForAboutWindow()
+        if let aboutWindowOpener {
+            aboutWindowOpener()
+        } else {
+            // Keep the app-menu item functional before the status menu has
+            // supplied SwiftUI's openWindow action.
+            DispatchQueue.main.async { [weak self] in
+                self?.presentAboutFreeshots()
+            }
+        }
+    }
+
+    func setAboutWindowOpener(_ opener: @escaping () -> Void) {
+        aboutWindowOpener = opener
+    }
+
+    func aboutWindowDidClose() {
+        guard aboutPreviousActivationPolicy == .accessory else { return }
+        aboutPreviousActivationPolicy = nil
+        NSApp.setActivationPolicy(.accessory)
+        hideApplicationMenu()
+        NSApp.hide(nil)
+    }
+
+    private func prepareForAboutWindow() {
+        if aboutPreviousActivationPolicy == nil {
+            aboutPreviousActivationPolicy = NSApp.activationPolicy()
+        }
+        NSApp.unhide(nil)
+        NSApp.setActivationPolicy(.regular)
+        showApplicationMenu()
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func presentAboutFreeshots() {
         if let aboutWindow {
             aboutWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
-        aboutPreviousActivationPolicy = NSApp.activationPolicy()
-        NSApp.unhide(nil)
-        NSApp.setActivationPolicy(.regular)
-        showApplicationMenu()
-        NSApp.activate(ignoringOtherApps: true)
+        prepareForAboutWindow()
         let window = AboutFreeshotsWindow(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 470),
             styleMask: [.titled, .closable],
@@ -690,22 +747,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         window.didClose = { [weak self] in
             guard let self else { return }
             self.aboutWindow = nil
-            if self.aboutPreviousActivationPolicy == .accessory {
-                self.aboutPreviousActivationPolicy = nil
-                NSApp.setActivationPolicy(.accessory)
-                self.hideApplicationMenu()
-                NSApp.hide(nil)
-            }
+            self.aboutWindowDidClose()
         }
         window.contentMinSize = NSSize(width: 420, height: 470)
         window.contentMaxSize = NSSize(width: 420, height: 470)
+        window.level = .floating
         let host = NSHostingView(rootView: AboutFreeshotsView())
         host.sizingOptions = []
         window.contentView = host
         window.center()
-        window.makeKeyAndOrderFront(nil)
         aboutWindow = window
         NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 
     func hideApplicationMenu() {
